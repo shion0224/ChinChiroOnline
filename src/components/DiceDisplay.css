@@ -1,0 +1,70 @@
+.dice-container {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+.dice-placeholder {
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
+  background: #e9ecef;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 2rem;
+  color: #999;
+  border: 3px dashed #ccc;
+}
+
+.dice {
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  border: 3px solid #667eea;
+  transition: transform 0.3s;
+}
+
+.dice.rolling {
+  animation: roll 0.5s infinite;
+}
+
+@keyframes roll {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(90deg);
+  }
+  50% {
+    transform: rotate(180deg);
+  }
+  75% {
+    transform: rotate(270deg);
+  }
+}
+
+.dice-emoji {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.dice-number {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #666;
+  margin-top: 0.25rem;
+}
+
+.dice-container.rolling .dice {
+  animation: roll 0.3s infinite;
+}
+
