@@ -108,16 +108,21 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.chips-setting label {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
+.chips-setting h3 {
+  margin: 0 0 0.8rem 0;
+  font-size: 0.95rem;
+  color: #aaa;
   font-weight: 500;
+}
+
+.chips-input-row {
+  display: flex;
+  gap: 0.5rem;
   margin-bottom: 0.8rem;
 }
 
-.chips-setting input[type="number"] {
-  width: 140px;
+.chips-input-row input[type="number"] {
+  flex: 1;
   padding: 0.5rem 0.8rem;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
@@ -156,8 +161,7 @@
 }
 
 .save-chips-button {
-  width: 100%;
-  padding: 0.6rem 1rem;
+  padding: 0.5rem 1.2rem;
   border: none;
   border-radius: 8px;
   background: linear-gradient(135deg, #4fc3f7, #29b6f6);
@@ -165,6 +169,7 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
+  white-space: nowrap;
 }
 
 .save-chips-button:hover:not(:disabled) {
@@ -174,6 +179,25 @@
 .save-chips-button:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+.chips-current {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.chips-current strong {
+  color: #f0c040;
+}
+
+.waiting-host-section {
+  margin-top: 1.5rem;
+}
+
+.waiting-host-section .chips-current {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
 }
 
 .start-button {

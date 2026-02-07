@@ -5,7 +5,7 @@ import { getSupabaseAdmin } from '../_shared/supabaseAdmin.ts'
 /**
  * set-chips Edge Function
  *
- * 待機中のルームで、プレイヤーが自分の初期チップ額を設定する。
+ * ホストがルーム内の全プレイヤーの初期チップ額を一括設定する。
  * ゲーム開始前（room.status === 'waiting'）のみ変更可能。
  *
  * Request body: { playerId: string, roomId: string, chips: number }
@@ -37,7 +37,7 @@ serve(async (req: Request) => {
     // ルーム状態の確認
     const { data: room, error: roomError } = await supabase
       .from('rooms')
-      .select('status')
+      .select('status, host_id')
       .eq('id', roomId)
       .single()
 
@@ -48,6 +48,14 @@ serve(async (req: Request) => {
       )
     }
 
+    // ホストのみ設定可能
+    if (room.host_id !== playerId) {
+      return new Response(
+        JSON.stringify({ error: 'チップ額を設定できるのはホストのみです' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     if (room.status !== 'waiting') {
       return new Response(
         JSON.stringify({ error: 'ゲーム開始後はチップ額を変更できません' }),
@@ -55,27 +63,23 @@ serve(async (req: Request) => {
       )
     }
 
-    // プレイヤーのチップ額を更新
-    const { data: player, error: updateError } = await supabase
+    // ルーム内の全プレイヤーのチップ額を一括更新
+    const { error: updateError } = await supabase
       .from('players')
       .update({ chips: amount })
-      .eq('id', playerId)
       .eq('room_id', roomId)
-      .select()
-      .single()
 
-    if (updateError || !player) {
+    if (updateError) {
       return new Response(
-        JSON.stringify({ error: 'プレイヤーが見つかりません' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: `チップ更新エラー: ${updateError.message}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        playerId: player.id,
-        chips: player.chips,
+        chips: amount,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

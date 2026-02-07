@@ -103,65 +103,71 @@ function GameRoom({
             <h2>ゲーム開始を待っています...</h2>
             <p>{players.length}人のプレイヤーが参加しています</p>
 
-            <div className="chips-setting">
-              <label>
-                持ち金額:
-                <input
-                  type="number"
-                  value={chipInput}
-                  onChange={(e) => setChipInput(Math.max(100, Number(e.target.value)))}
-                  min={100}
-                  max={1000000}
-                  step={100}
-                />
-              </label>
-              <div className="chips-presets">
-                {[500, 1000, 5000, 10000, 50000].map((v) => (
-                  <button
-                    key={v}
-                    className={chipInput === v ? 'active' : ''}
-                    onClick={() => setChipInput(v)}
-                  >
-                    {v.toLocaleString()}
-                  </button>
-                ))}
-              </div>
-              <button
-                className="save-chips-button"
-                onClick={async () => {
-                  setIsSavingChips(true)
-                  try {
-                    await setChipsApi(roomId, playerId, chipInput)
-                  } catch (err) {
-                    handleError((err as Error).message)
-                  } finally {
-                    setIsSavingChips(false)
-                  }
-                }}
-                disabled={isSavingChips || (myPlayer?.chips === chipInput)}
-              >
-                {isSavingChips
-                  ? '設定中...'
-                  : myPlayer?.chips === chipInput
-                    ? `${chipInput.toLocaleString()} チップ (設定済み)`
-                    : `${chipInput.toLocaleString()} チップに設定`}
-              </button>
-            </div>
+            {isHost ? (
+              <>
+                <div className="chips-setting">
+                  <h3>初期チップ額（全員共通）</h3>
+                  <div className="chips-input-row">
+                    <input
+                      type="number"
+                      value={chipInput}
+                      onChange={(e) => setChipInput(Math.max(100, Number(e.target.value)))}
+                      min={100}
+                      max={1000000}
+                      step={100}
+                    />
+                    <button
+                      className="save-chips-button"
+                      onClick={async () => {
+                        setIsSavingChips(true)
+                        try {
+                          await setChipsApi(roomId, playerId, chipInput)
+                        } catch (err) {
+                          handleError((err as Error).message)
+                        } finally {
+                          setIsSavingChips(false)
+                        }
+                      }}
+                      disabled={isSavingChips}
+                    >
+                      {isSavingChips ? '設定中...' : '設定'}
+                    </button>
+                  </div>
+                  <div className="chips-presets">
+                    {[500, 1000, 5000, 10000, 50000].map((v) => (
+                      <button
+                        key={v}
+                        className={chipInput === v ? 'active' : ''}
+                        onClick={() => setChipInput(v)}
+                      >
+                        {v.toLocaleString()}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="chips-current">
+                    現在の設定: <strong>{(myPlayer?.chips ?? 1000).toLocaleString()}</strong> チップ
+                  </p>
+                </div>
 
-            {players.length < 2 && (
-              <p className="min-players-warning">
-                最低2人のプレイヤーが必要です
-              </p>
-            )}
-            {isHost && players.length >= 2 && (
-              <button onClick={handleStartGame} className="start-button">
-                ゲームを開始
-              </button>
-            )}
-            {!isHost && (
-              <p className="waiting-host">
-                ホストがゲームを開始するのを待っています
-              </p>
+                {players.length < 2 ? (
+                  <p className="min-players-warning">
+                    最低2人のプレイヤーが必要です
+                  </p>
+                ) : (
+                  <button onClick={handleStartGame} className="start-button">
+                    ゲームを開始
+                  </button>
+                )}
+              </>
+            ) : (
+              <div className="waiting-host-section">
+                <p className="chips-current">
+                  初期チップ: <strong>{(myPlayer?.chips ?? 1000).toLocaleString()}</strong> チップ
+                </p>
+                <p className="waiting-host">
+                  ホストがゲームを開始するのを待っています...
+                </p>
+              </div>
             )}
           </div>
         )}
