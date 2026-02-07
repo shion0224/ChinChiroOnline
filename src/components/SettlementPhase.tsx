@@ -50,9 +50,25 @@ function SettlementPhase({
     setIsSettling(true)
     try {
       const data = await settleRound(roundId, playerId)
-      setResults(data)
+
+      // 既に精算済みの場合はサイレントに処理
+      if (data.alreadySettled) {
+        setSettled(true)
+        return
+      }
+
+      // フェーズが合わない場合はサイレントに無視
+      if (data.notSettlementPhase) {
+        console.log('Settle skipped:', data.message)
+        return
+      }
+
+      if (data.results) {
+        setResults(data)
+      }
       setSettled(true)
     } catch (err) {
+      console.error('Settle error:', err)
       onError?.((err as Error).message)
     } finally {
       setIsSettling(false)

@@ -77,30 +77,42 @@ export interface JoinRoomResponse {
 }
 
 export interface RollDiceResponse {
-  roll: {
+  roll?: {
+    id?: string
     dice1: number
     dice2: number
     dice3: number
   }
-  hand: {
+  hand?: {
     displayName: string
     type: string
     value: number | null
   }
-  attempt: number
-  decided: boolean
-  allRolled?: boolean
-  winner?: Player | null
+  attempt?: number
+  decided?: boolean
+  phaseChanged?: boolean
+  newPhase?: string
+  alreadyFinal?: boolean
+  notYourTurn?: boolean
+  notYourPhase?: boolean
+  message?: string
+  currentPhase?: string
+  currentTurnPlayerId?: string | null
+  error?: string | null
 }
 
 export interface SettleRoundResponse {
-  results: {
+  success?: boolean
+  results?: {
     playerId: string
     playerName: string
     isParent: boolean
     chipChange: number
   }[]
-  gameFinished: boolean
+  gameFinished?: boolean
+  alreadySettled?: boolean
+  notSettlementPhase?: boolean
+  message?: string
 }
 
 /** ルーム一覧用（プレイヤー数付き） */

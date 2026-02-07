@@ -52,11 +52,22 @@ serve(async (req: Request) => {
     }
 
     if (round.phase !== 'settlement') {
-      return errorResponse('現在は精算フェーズではありません')
+      // 精算フェーズでない場合も、エラーにしない（フェーズ遷移の競合を防ぐ）
+      return jsonResponse({
+        success: false,
+        notSettlementPhase: true,
+        currentPhase: round.phase,
+        message: '現在は精算フェーズではありません',
+      })
     }
 
     if (round.status === 'finished') {
-      return errorResponse('このラウンドは既に精算済みです')
+      // 既に精算済みの場合、エラーではなく成功を返す（べき等）
+      return jsonResponse({
+        success: true,
+        alreadySettled: true,
+        message: 'このラウンドは既に精算済みです',
+      })
     }
 
     const roomId = round.room_id as string

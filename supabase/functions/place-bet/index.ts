@@ -38,8 +38,31 @@ serve(async (req: Request) => {
       return errorResponse('ラウンドが見つかりません', 404)
     }
 
+    // 既にベット済みか確認（フェーズチェックより先にチェック → べき等）
+    const { data: existingBet } = await supabase
+      .from('round_bets')
+      .select('*')
+      .eq('game_round_id', roundId)
+      .eq('player_id', playerId)
+      .maybeSingle()
+
+    if (existingBet) {
+      // 既にベット済みの場合、エラーではなく既存のベットを返す（べき等）
+      return jsonResponse({
+        success: true,
+        bet: existingBet,
+        alreadyBet: true,
+        phaseChanged: false,
+      })
+    }
+
     if (round.phase !== 'betting') {
-      return errorResponse('現在はベットフェーズではありません')
+      return jsonResponse({
+        success: false,
+        notBettingPhase: true,
+        currentPhase: round.phase,
+        message: '現在はベットフェーズではありません',
+      })
     }
 
     // プレイヤー情報を取得
@@ -54,26 +77,18 @@ serve(async (req: Request) => {
       return errorResponse('プレイヤーが見つかりません', 404)
     }
 
-    // 親はベットしない
+    // 親はベットしない（200で返して UI エラーを防ぐ）
     if (player.id === round.parent_id) {
-      return errorResponse('親はベットできません')
+      return jsonResponse({
+        success: false,
+        isParent: true,
+        message: '親はベットできません',
+      })
     }
 
     // チップが足りるか確認
     if (player.chips < amount) {
       return errorResponse(`チップが不足しています（残り: ${player.chips}）`)
-    }
-
-    // 既にベット済みか確認
-    const { data: existingBet } = await supabase
-      .from('round_bets')
-      .select('*')
-      .eq('game_round_id', roundId)
-      .eq('player_id', playerId)
-      .single()
-
-    if (existingBet) {
-      return errorResponse('既にベット済みです')
     }
 
     // ベットを配置

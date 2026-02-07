@@ -46,7 +46,7 @@ function RollingPhase({
   }, [roundId])
 
   const handleRoll = async () => {
-    if (isRolling || !isMyTurn) return
+    if (isRolling || !isMyTurn || myFinalRoll) return
 
     setIsRolling(true)
     setLastRollResult(null)
@@ -55,8 +55,16 @@ function RollingPhase({
       // 振るアニメーション用に少し待つ
       await new Promise((resolve) => setTimeout(resolve, 800))
       const result = await rollDiceApi(roundId, playerId)
+
+      // ターン外やフェーズ外の場合はサイレントに無視
+      if (result.notYourTurn || result.notYourPhase || result.alreadyFinal) {
+        console.log('Roll skipped:', result.message)
+        return
+      }
+
       setLastRollResult(result)
     } catch (err) {
+      console.error('Roll error:', err)
       onError?.((err as Error).message)
     } finally {
       setIsRolling(false)

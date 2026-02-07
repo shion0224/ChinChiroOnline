@@ -7,6 +7,7 @@ import type { RollDiceResponse, SettleRoundResponse } from '../types/database'
 
 /**
  * Edge Functionを呼び出す汎用ヘルパー
+ * non-2xx レスポンスから実際のエラーメッセージを抽出する
  */
 async function callEdgeFunction<T = Record<string, unknown>>(
   functionName: string,
@@ -17,16 +18,58 @@ async function callEdgeFunction<T = Record<string, unknown>>(
   })
 
   if (error) {
-    const message = error.message || 'サーバーエラーが発生しました'
+    // non-2xx レスポンスの場合、error.context にレスポンスボディが入っている
+    let message = 'サーバーエラーが発生しました'
+    try {
+      // FunctionsHttpError の context はパース済みのレスポンスボディ
+      const ctx = (error as unknown as { context?: unknown }).context
+      if (ctx) {
+        if (typeof ctx === 'object' && ctx !== null && 'error' in ctx) {
+          message = String((ctx as Record<string, unknown>).error)
+        } else if (typeof ctx === 'string') {
+          try {
+            const parsed = JSON.parse(ctx)
+            if (parsed?.error) {
+              message = parsed.error
+            }
+          } catch {
+            message = ctx
+          }
+        }
+      }
+    } catch {
+      // パース失敗時はデフォルトメッセージを使用
+      if (error.message && !error.message.includes('non-2xx')) {
+        message = error.message
+      }
+    }
     throw new Error(message)
   }
 
-  const dataObj = data as Record<string, unknown> | null
-  if (dataObj?.error) {
-    throw new Error(String(dataObj.error))
-  }
-
   return data as T
+}
+
+// ---- 公開API ----
+
+/**
+ * ルームを作成する
+ */
+export async function createRoom(
+  playerName: string,
+  roomName: string,
+  maxPlayers: number = 4
+): Promise<{ roomId: string; playerId: string; roomName: string; isHost: boolean }> {
+  return callEdgeFunction('create-room', { playerName, roomName, maxPlayers })
+}
+
+/**
+ * ルームに参加する
+ */
+export async function joinRoom(
+  playerName: string,
+  roomId: string
+): Promise<{ roomId: string; playerId: string; roomName: string; isHost: boolean }> {
+  return callEdgeFunction('join-room', { playerName, roomId })
 }
 
 /**
@@ -37,6 +80,16 @@ export async function startGame(
   playerId: string
 ): Promise<Record<string, unknown>> {
   return callEdgeFunction('start-game', { roomId, playerId })
+}
+
+/**
+ * ルームから退出する
+ */
+export async function leaveRoom(
+  roomId: string,
+  playerId: string
+): Promise<Record<string, unknown>> {
+  return callEdgeFunction('leave-room', { playerId, roomId })
 }
 
 /**

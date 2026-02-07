@@ -67,17 +67,46 @@ export function useRealtimeGame(
 
   // アクティブなゲームラウンドを読み込む
   const loadGameRound = useCallback(async () => {
-    const { data, error } = await supabase
+    // playing のラウンドを優先、なければ最新の finished
+    const { data: playingRound } = await supabase
       .from('game_rounds')
       .select('*')
       .eq('room_id', roomId)
-      .in('status', ['playing', 'finished'])
+      .eq('status', 'playing')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 
-    if (!error && data) {
-      setGameRound(data as GameRound)
+    if (playingRound) {
+      setGameRound((prev) => {
+        // ラウンドIDが変わった場合、rolls/betsをクリア
+        if (prev && prev.id !== playingRound.id) {
+          setRolls([])
+          setBets([])
+        }
+        return playingRound as GameRound
+      })
+      return
+    }
+
+    // playing がなければ最新の finished を取得
+    const { data: finishedRound } = await supabase
+      .from('game_rounds')
+      .select('*')
+      .eq('room_id', roomId)
+      .eq('status', 'finished')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (finishedRound) {
+      setGameRound((prev) => {
+        if (prev && prev.id !== finishedRound.id) {
+          setRolls([])
+          setBets([])
+        }
+        return finishedRound as GameRound
+      })
     }
   }, [roomId])
 
