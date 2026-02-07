@@ -1,0 +1,197 @@
+.settlement-phase {
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.settlement-phase h2 {
+  margin-bottom: 1rem;
+  color: #ce93d8;
+}
+
+.parent-result {
+  font-size: 1.1rem;
+  margin-bottom: 1.5rem;
+  padding: 0.8rem;
+  background: rgba(240, 192, 64, 0.1);
+  border: 1px solid rgba(240, 192, 64, 0.3);
+  border-radius: 8px;
+}
+
+.parent-result strong {
+  color: #f0c040;
+}
+
+.all-results {
+  margin-bottom: 1.5rem;
+  text-align: left;
+}
+
+.all-results h3 {
+  margin-bottom: 0.5rem;
+  color: #aaa;
+  font-size: 0.95rem;
+}
+
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.result-row.parent {
+  background: rgba(240, 192, 64, 0.05);
+}
+
+.result-player {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.result-player-name {
+  font-weight: 500;
+}
+
+.result-dice {
+  color: #888;
+  font-size: 0.85rem;
+  font-family: monospace;
+}
+
+.result-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+}
+
+.result-hand-type {
+  font-weight: bold;
+}
+
+.result-bet {
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+.result-multiplier.win {
+  color: #4caf50;
+  font-weight: bold;
+}
+
+.result-multiplier.lose {
+  color: #f44336;
+  font-weight: bold;
+}
+
+.result-multiplier.draw {
+  color: #888;
+}
+
+.settle-button {
+  padding: 0.8rem 2rem;
+  background: linear-gradient(135deg, #ce93d8, #ab47bc);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 1rem;
+}
+
+.settle-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(206, 147, 216, 0.3);
+}
+
+.settle-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settlement-results {
+  margin-top: 1rem;
+  text-align: left;
+}
+
+.settlement-results h3 {
+  margin-bottom: 0.5rem;
+  color: #aaa;
+  font-size: 0.95rem;
+}
+
+.settlement-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settlement-item.win {
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.settlement-item.lose {
+  background: rgba(244, 67, 54, 0.1);
+}
+
+.settlement-name {
+  font-weight: 500;
+}
+
+.settlement-change {
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.settlement-item.win .settlement-change {
+  color: #4caf50;
+}
+
+.settlement-item.lose .settlement-change {
+  color: #f44336;
+}
+
+.settlement-item.draw .settlement-change {
+  color: #888;
+}
+
+.game-finished {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  border-radius: 8px;
+}
+
+.game-finished h3 {
+  color: #f44336;
+}
+
+.next-round-info {
+  margin-top: 1rem;
+  padding: 0.8rem;
+  background: rgba(76, 175, 80, 0.1);
+  border-radius: 8px;
+}
+
+.next-round-info p {
+  color: #4caf50;
+}
+
+.already-settled {
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.already-settled p {
+  color: #aaa;
+}

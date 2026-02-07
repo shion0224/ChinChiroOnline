@@ -1,0 +1,175 @@
+.rolling-phase {
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.rolling-phase h2 {
+  margin-bottom: 1rem;
+  color: #4fc3f7;
+}
+
+.phase-info {
+  margin-bottom: 1.5rem;
+}
+
+.parent-hand {
+  font-size: 1.1rem;
+  margin-bottom: 0.3rem;
+  color: #f0c040;
+}
+
+.current-turn {
+  font-size: 1rem;
+  color: #ccc;
+}
+
+.my-turn {
+  color: #4caf50;
+  font-weight: bold;
+}
+
+.roll-section {
+  margin-bottom: 1.5rem;
+}
+
+.rolling-animation {
+  padding: 2rem;
+}
+
+.rolling-animation p {
+  margin-top: 1rem;
+  color: #aaa;
+}
+
+.roll-result {
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+}
+
+.roll-result.bara {
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+}
+
+.hand-name {
+  font-size: 1.3rem;
+  font-weight: bold;
+  margin-top: 0.5rem;
+}
+
+.hand-name.final {
+  color: #4caf50;
+}
+
+.retry-message {
+  color: #ff9800;
+  margin-top: 0.3rem;
+  font-size: 0.9rem;
+}
+
+.attempt-info {
+  color: #aaa;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.roll-button {
+  padding: 1rem 2.5rem;
+  background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 15px rgba(79, 195, 247, 0.3);
+}
+
+.roll-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(79, 195, 247, 0.4);
+}
+
+.roll-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.my-result {
+  padding: 1.5rem;
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.my-result h3 {
+  margin-bottom: 0.5rem;
+}
+
+.waiting-others {
+  color: #aaa;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.waiting-turn {
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.waiting-turn p {
+  color: #aaa;
+  font-size: 1.1rem;
+}
+
+.results-list {
+  margin-top: 1rem;
+  text-align: left;
+}
+
+.results-list h3 {
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+  color: #aaa;
+}
+
+.result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background 0.2s;
+}
+
+.result-item.active {
+  background: rgba(79, 195, 247, 0.1);
+  border-left: 3px solid #4fc3f7;
+}
+
+.result-item.decided {
+  opacity: 0.8;
+}
+
+.result-name {
+  font-weight: 500;
+}
+
+.result-hand strong {
+  color: #4caf50;
+}
+
+.result-rolling {
+  color: #ff9800;
+}
+
+.result-waiting {
+  color: #666;
+}

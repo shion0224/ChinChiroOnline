@@ -1,112 +1,53 @@
 /**
- * サイコロを1つ振る
- * @returns {number} 1-6のランダムな数字
+ * チンチロ ゲームロジック（クライアント表示用）
+ *
+ * サイコロの生成はサーバー側（Edge Function）で行うため、
+ * ここでは表示・判定のヘルパーのみを提供する。
  */
-export function rollDice() {
-  return Math.floor(Math.random() * 6) + 1
+
+/**
+ * 役の強さの順序定義（表示用）
+ */
+export const HAND_TYPES = {
+  pinzoro: { name: 'ピンゾロ', multiplier: 3, isWin: true },
+  zoro: { name: 'ゾロ目', multiplier: 2, isWin: true },
+  shigoro: { name: 'シゴロ', multiplier: 1, isWin: true },
+  normal: { name: '通常目', multiplier: 1, isWin: null },  // 比較次第
+  hifumi: { name: 'ヒフミ', multiplier: 2, isWin: false },
+  shonben: { name: 'ションベン', multiplier: 1, isWin: false },
+  bara: { name: 'バラ（役なし）', multiplier: 0, isWin: null },
 }
 
 /**
- * 3つのサイコロを振る
- * @returns {number[]} [dice1, dice2, dice3]
+ * 役名（displayName）からCSSクラス用の文字列を返す
  */
-export function rollThreeDice() {
-  return [rollDice(), rollDice(), rollDice()].sort((a, b) => a - b)
+export function getHandClass(displayName) {
+  if (!displayName) return ''
+  if (displayName === 'ピンゾロ') return 'hand-pinzoro'
+  if (displayName.includes('ゾロ目')) return 'hand-zoro'
+  if (displayName === 'シゴロ') return 'hand-shigoro'
+  if (displayName === 'ヒフミ') return 'hand-hifumi'
+  if (displayName === 'ションベン') return 'hand-shonben'
+  if (displayName.includes('の目')) return 'hand-normal'
+  return 'hand-bara'
 }
 
 /**
- * チンチロの役を判定する
- * @param {number[]} dice - サイコロの結果 [dice1, dice2, dice3]（昇順ソート済み）
- * @returns {Object} { handType: string, handValue: number | null }
+ * 精算倍率の表示テキストを生成
+ * @param {number} multiplier - 倍率（正=子勝ち、負=子負け）
+ * @param {number} betAmount - ベット額
  */
-export function evaluateHand(dice) {
-  const [d1, d2, d3] = dice
-
-  // ピンゾロ（111）
-  if (d1 === 1 && d2 === 1 && d3 === 1) {
-    return { handType: 'pinzoro', handValue: null, displayName: 'ピンゾロ' }
-  }
-
-  // ゾロ目（222, 333, 444, 555, 666）
-  if (d1 === d2 && d2 === d3) {
-    return { handType: 'zoro', handValue: d1, displayName: `${d1}のゾロ` }
-  }
-
-  // シゴロ（456）
-  if (d1 === 4 && d2 === 5 && d3 === 6) {
-    return { handType: 'shigoro', handValue: null, displayName: 'シゴロ' }
-  }
-
-  // 目なし（123, 234, 345）
-  if ((d1 === 1 && d2 === 2 && d3 === 3) ||
-      (d1 === 2 && d2 === 3 && d3 === 4) ||
-      (d1 === 3 && d2 === 4 && d3 === 5)) {
-    return { handType: 'menashi', handValue: null, displayName: '目なし' }
-  }
-
-  // 通常目（2つのサイコロが同じ）
-  if (d1 === d2) {
-    return { handType: 'normal', handValue: d3, displayName: `${d1}の${d3}` }
-  }
-  if (d2 === d3) {
-    return { handType: 'normal', handValue: d1, displayName: `${d2}の${d1}` }
-  }
-  if (d1 === d3) {
-    return { handType: 'normal', handValue: d2, displayName: `${d1}の${d2}` }
-  }
-
-  // 役なし（バラ）
-  return { handType: 'bara', handValue: null, displayName: '役なし' }
+export function formatSettlementText(multiplier, betAmount) {
+  if (multiplier === 0) return '引き分け'
+  const amount = Math.abs(multiplier * betAmount)
+  if (multiplier > 0) return `+${amount} チップ`
+  return `-${amount} チップ`
 }
 
 /**
- * 役の強さを数値で比較するための値を取得
- * @param {Object} hand - evaluateHand()の戻り値
- * @returns {number} 強さの数値（大きいほど強い）
+ * サイコロの絵文字を取得
  */
-export function getHandStrength(hand) {
-  const { handType, handValue } = hand
-
-  switch (handType) {
-    case 'pinzoro':
-      return 1000
-    case 'zoro':
-      return 900 + (handValue || 0)
-    case 'shigoro':
-      return 800
-    case 'menashi':
-      return 700
-    case 'normal':
-      return 100 + (handValue || 0)
-    case 'bara':
-      return 0
-    default:
-      return 0
-  }
+export function getDiceEmoji(value) {
+  const diceEmojis = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅']
+  return diceEmojis[value - 1] || '?'
 }
-
-/**
- * 2つの役を比較して勝敗を判定
- * @param {Object} hand1 - プレイヤー1の役
- * @param {Object} hand2 - プレイヤー2の役
- * @returns {number} 1ならhand1の勝ち、-1ならhand2の勝ち、0なら引き分け
- */
-export function compareHands(hand1, hand2) {
-  const strength1 = getHandStrength(hand1)
-  const strength2 = getHandStrength(hand2)
-
-  if (strength1 > strength2) return 1
-  if (strength1 < strength2) return -1
-  return 0
-}
-
-/**
- * サイコロを振って役を判定する（完全な結果を返す）
- * @returns {Object} { dice: number[], hand: Object }
- */
-export function rollAndEvaluate() {
-  const dice = rollThreeDice()
-  const hand = evaluateHand(dice)
-  return { dice, hand }
-}
-

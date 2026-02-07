@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { rollAndEvaluate } from '../utils/gameLogic'
-import DiceDisplay from './DiceDisplay'
+import { startGame } from '../lib/gameApi'
+import BettingPhase from './BettingPhase'
+import RollingPhase from './RollingPhase'
+import SettlementPhase from './SettlementPhase'
 import PlayerList from './PlayerList'
 import './GameRoom.css'
 
@@ -9,49 +11,14 @@ function GameRoom({ roomId, playerId, isHost, playerName }) {
   const [players, setPlayers] = useState([])
   const [gameRound, setGameRound] = useState(null)
   const [rolls, setRolls] = useState([])
-  const [myRoll, setMyRoll] = useState(null)
-  const [isRolling, setIsRolling] = useState(false)
+  const [bets, setBets] = useState([])
   const [room, setRoom] = useState(null)
-  const [gameStatus, setGameStatus] = useState('waiting') // waiting, playing, finished
-  const [winner, setWinner] = useState(null)
+  const [gameStatus, setGameStatus] = useState('waiting')
+  const [error, setError] = useState('')
 
-  // ルーム情報とプレイヤー情報を読み込む
-  useEffect(() => {
-    loadRoomData()
-    loadPlayers()
+  // ---- データ読み込み関数 ----
 
-    // Realtime購読
-    const playersChannel = supabase
-      .channel(`room-${roomId}-players`)
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` },
-        () => {
-          loadPlayers()
-        }
-      )
-      .subscribe()
-
-    const roomChannel = supabase
-      .channel(`room-${roomId}-room`)
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` },
-        () => {
-          loadRoomData()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(playersChannel)
-      supabase.removeChannel(roomChannel)
-      // クリーンアップ時にプレイヤーを削除
-      if (playerId) {
-        supabase.from('players').delete().eq('id', playerId).then(() => {})
-      }
-    }
-  }, [roomId, playerId])
-
-  const loadRoomData = async () => {
+  const loadRoomData = useCallback(async () => {
     const { data, error } = await supabase
       .from('rooms')
       .select('*')
@@ -62,22 +29,42 @@ function GameRoom({ roomId, playerId, isHost, playerName }) {
       setRoom(data)
       setGameStatus(data.status)
     }
-  }
+  }, [roomId])
 
-  const loadPlayers = async () => {
+  const loadPlayers = useCallback(async () => {
     const { data, error } = await supabase
       .from('players')
       .select('*')
       .eq('room_id', roomId)
-      .order('created_at', { ascending: true })
+      .order('turn_order', { ascending: true })
 
     if (!error && data) {
       setPlayers(data)
     }
-  }
+  }, [roomId])
 
-  const loadRolls = async () => {
-    if (!gameRound) return
+  const loadCurrentRound = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('game_rounds')
+      .select('*')
+      .eq('room_id', roomId)
+      .eq('status', 'playing')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (!error && data) {
+      setGameRound(data)
+    } else {
+      setGameRound(null)
+    }
+  }, [roomId])
+
+  const loadRolls = useCallback(async () => {
+    if (!gameRound) {
+      setRolls([])
+      return
+    }
 
     const { data, error } = await supabase
       .from('player_rolls')
@@ -87,303 +74,292 @@ function GameRoom({ roomId, playerId, isHost, playerName }) {
 
     if (!error && data) {
       setRolls(data)
-      const myRollData = data.find(r => r.player_id === playerId)
-      setMyRoll(myRollData)
     }
-  }
+  }, [gameRound])
 
-  // サイコロ結果のRealtime購読
+  const loadBets = useCallback(async () => {
+    if (!gameRound) {
+      setBets([])
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('round_bets')
+      .select('*')
+      .eq('game_round_id', gameRound.id)
+
+    if (!error && data) {
+      setBets(data)
+    }
+  }, [gameRound])
+
+  // ---- 初期読み込み ----
+
+  useEffect(() => {
+    loadRoomData()
+    loadPlayers()
+  }, [loadRoomData, loadPlayers])
+
+  // ゲームが playing の時にラウンドを読み込む
+  useEffect(() => {
+    if (gameStatus === 'playing') {
+      loadCurrentRound()
+    }
+  }, [gameStatus, loadCurrentRound])
+
+  // ラウンドが変わったらロールとベットを読み込む
+  useEffect(() => {
+    if (gameRound) {
+      loadRolls()
+      loadBets()
+    } else {
+      setRolls([])
+      setBets([])
+    }
+  }, [gameRound, loadRolls, loadBets])
+
+  // ---- Realtime サブスクリプション ----
+
+  useEffect(() => {
+    // ルーム状態の監視
+    const roomChannel = supabase
+      .channel(`room-${roomId}-room`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` },
+        () => {
+          loadRoomData()
+        }
+      )
+      .subscribe()
+
+    // プレイヤーの参加/退出/更新の監視
+    const playersChannel = supabase
+      .channel(`room-${roomId}-players`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` },
+        () => {
+          loadPlayers()
+        }
+      )
+      .subscribe()
+
+    // ゲームラウンドの監視
+    const roundsChannel = supabase
+      .channel(`room-${roomId}-rounds`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'game_rounds', filter: `room_id=eq.${roomId}` },
+        () => {
+          loadCurrentRound()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(roomChannel)
+      supabase.removeChannel(playersChannel)
+      supabase.removeChannel(roundsChannel)
+      // クリーンアップ時にプレイヤーを削除
+      if (playerId) {
+        supabase.from('players').delete().eq('id', playerId).then(() => {})
+      }
+    }
+  }, [roomId, playerId, loadRoomData, loadPlayers, loadCurrentRound])
+
+  // ロールの監視（ラウンドが変わるたびに再購読）
   useEffect(() => {
     if (!gameRound) return
 
     const rollsChannel = supabase
-      .channel(`room-${roomId}-rolls`)
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'player_rolls' },
+      .channel(`room-${roomId}-rolls-${gameRound.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'player_rolls',
+          filter: `game_round_id=eq.${gameRound.id}`,
+        },
         () => {
           loadRolls()
         }
       )
       .subscribe()
 
+    const betsChannel = supabase
+      .channel(`room-${roomId}-bets-${gameRound.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'round_bets',
+          filter: `game_round_id=eq.${gameRound.id}`,
+        },
+        () => {
+          loadBets()
+        }
+      )
+      .subscribe()
+
     return () => {
       supabase.removeChannel(rollsChannel)
+      supabase.removeChannel(betsChannel)
     }
-  }, [gameRound, roomId])
+  }, [roomId, gameRound, loadRolls, loadBets])
 
-  // ゲームラウンドが変更されたらロールを読み込む
-  useEffect(() => {
-    if (gameRound) {
-      loadRolls()
-    }
-  }, [gameRound])
+  // ---- アクション ----
 
-  // ゲームラウンドを読み込む
-  useEffect(() => {
-    if (gameStatus === 'playing') {
-      loadGameRound()
-    }
-  }, [gameStatus, roomId])
-
-  const loadGameRound = async () => {
-    const { data, error } = await supabase
-      .from('game_rounds')
-      .select('*')
-      .eq('room_id', roomId)
-      .eq('status', 'playing')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (!error && data) {
-      setGameRound(data)
-    } else if (error && error.code === 'PGRST116') {
-      // ラウンドが存在しない場合は作成
-      if (isHost) {
-        await createGameRound()
-      }
-    }
-  }
-
-  const createGameRound = async () => {
-    const { data, error } = await supabase
-      .from('game_rounds')
-      .insert({
-        room_id: roomId,
-        round_number: 1,
-        status: 'playing'
-      })
-      .select()
-      .single()
-
-    if (!error && data) {
-      setGameRound(data)
-    }
-  }
-
-  const startGame = async () => {
+  const handleStartGame = async () => {
     if (!isHost) return
 
     try {
-      await supabase
-        .from('rooms')
-        .update({ status: 'playing' })
-        .eq('id', roomId)
-
-      await createGameRound()
+      setError('')
+      await startGame(roomId, playerId)
     } catch (err) {
       console.error('Error starting game:', err)
+      setError(err.message || 'ゲーム開始に失敗しました')
     }
   }
 
-  const rollDice = async () => {
-    if (!gameRound || myRoll || isRolling) return
-
-    setIsRolling(true)
-
-    // サイコロを振るアニメーションのため少し待つ
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    const { dice, hand } = rollAndEvaluate()
-
-    try {
-      const { data, error } = await supabase
-        .from('player_rolls')
-        .insert({
-          game_round_id: gameRound.id,
-          player_id: playerId,
-          dice1: dice[0],
-          dice2: dice[1],
-          dice3: dice[2],
-          hand_type: hand.displayName,
-          hand_value: hand.handValue || 0
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      setMyRoll(data)
-      setIsRolling(false)
-
-      // 全員がサイコロを振ったか確認
-      setTimeout(checkAllRolled, 500)
-    } catch (err) {
-      console.error('Error rolling dice:', err)
-      setIsRolling(false)
-    }
-  }
-
-  const checkAllRolled = async () => {
-    if (!gameRound) return
-
-    const { data: allRolls, error } = await supabase
-      .from('player_rolls')
-      .select('*')
-      .eq('game_round_id', gameRound.id)
-
-    if (error) return
-
-    // 全プレイヤーがサイコロを振ったか確認
-    if (allRolls.length === players.length && players.length > 0) {
-      determineWinner(allRolls)
-    }
-  }
-
-  const determineWinner = async (allRolls) => {
-    if (allRolls.length === 0) return
-
-    // 手の強さで比較
-    const sortedRolls = allRolls.sort((a, b) => {
-      const aStrength = getHandStrengthFromDB(a)
-      const bStrength = getHandStrengthFromDB(b)
-      return bStrength - aStrength
-    })
-
-    const winnerRoll = sortedRolls[0]
-    const winnerPlayer = players.find(p => p.id === winnerRoll.player_id)
-
-    setWinner(winnerPlayer)
-
-    // ゲームラウンドを終了
-    if (gameRound) {
-      await supabase
-        .from('game_rounds')
-        .update({ status: 'finished' })
-        .eq('id', gameRound.id)
-    }
-  }
-
-  const getHandStrengthFromDB = (roll) => {
-    const handType = roll.hand_type
-    const handValue = roll.hand_value || 0
-
-    // ピンゾロ
-    if (handType === 'ピンゾロ') return 1000
-    
-    // ゾロ目（例: "2のゾロ"）
-    if (handType.includes('ゾロ')) {
-      const zoroValue = parseInt(handType.match(/\d+/)?.[0]) || 0
-      return 900 + zoroValue
-    }
-    
-    // シゴロ
-    if (handType === 'シゴロ') return 800
-    
-    // 目なし
-    if (handType === '目なし') return 700
-    
-    // 通常目（例: "2の5"）
-    if (handType.includes('の') && handType !== '目なし') {
-      return 100 + handValue
-    }
-    
-    // 役なし
-    return 0
-  }
-
-  const resetGame = async () => {
-    if (!isHost) return
-
-    try {
-      // ラウンドを削除
-      if (gameRound) {
-        await supabase.from('game_rounds').delete().eq('id', gameRound.id)
-      }
-
-      // プレイヤーのロールを削除
-      await supabase.from('player_rolls').delete().eq('game_round_id', gameRound?.id)
-
-      // ルームを待機状態に戻す
-      await supabase
-        .from('rooms')
-        .update({ status: 'waiting' })
-        .eq('id', roomId)
-
-      setGameRound(null)
-      setRolls([])
-      setMyRoll(null)
-      setWinner(null)
-      setGameStatus('waiting')
-    } catch (err) {
-      console.error('Error resetting game:', err)
-    }
+  const handleError = (message) => {
+    setError(message)
+    setTimeout(() => setError(''), 5000)
   }
 
   const leaveRoom = () => {
     window.location.reload()
   }
 
+  // ---- レンダリング ----
+
+  const currentPhase = gameRound?.phase ?? null
+
   return (
     <div className="game-room">
       <div className="game-room-container">
+        {/* ヘッダー */}
         <div className="game-header">
-          <h1>🎲 チンチロオンライン</h1>
+          <h1>チンチロオンライン</h1>
           <div className="room-info">
             <span>ルーム: {room?.name || 'Loading...'}</span>
             <span className="room-id">ID: {roomId.substring(0, 8)}...</span>
+            {gameRound && (
+              <span className="round-number">
+                ラウンド {gameRound.round_number}
+              </span>
+            )}
           </div>
-          <button onClick={leaveRoom} className="leave-button">退出</button>
+          <button onClick={leaveRoom} className="leave-button">
+            退出
+          </button>
         </div>
 
-        <PlayerList players={players} currentPlayerId={playerId} rolls={rolls} />
+        {/* エラー表示 */}
+        {error && <div className="error-message">{error}</div>}
 
+        {/* プレイヤーリスト */}
+        <PlayerList
+          players={players}
+          currentPlayerId={playerId}
+          parentId={gameRound?.parent_id}
+          currentTurnPlayerId={gameRound?.current_turn_player_id}
+          rolls={rolls}
+          bets={bets}
+        />
+
+        {/* ゲーム状態に応じたUI */}
+
+        {/* 待機画面 */}
         {gameStatus === 'waiting' && (
           <div className="waiting-screen">
             <h2>ゲーム開始を待っています...</h2>
             <p>{players.length}人のプレイヤーが参加しています</p>
-            {isHost && (
-              <button onClick={startGame} className="start-button">
+            {players.length < 2 && (
+              <p className="min-players-warning">
+                最低2人のプレイヤーが必要です
+              </p>
+            )}
+            {isHost && players.length >= 2 && (
+              <button onClick={handleStartGame} className="start-button">
                 ゲームを開始
               </button>
+            )}
+            {!isHost && (
+              <p className="waiting-host">ホストがゲームを開始するのを待っています</p>
             )}
           </div>
         )}
 
-        {gameStatus === 'playing' && (
-          <div className="game-screen">
-            {!myRoll && !isRolling && (
-              <div className="roll-section">
-                <h2>サイコロを振ってください</h2>
-                <button onClick={rollDice} className="roll-button">
-                  サイコロを振る
-                </button>
-              </div>
-            )}
+        {/* ベットフェーズ */}
+        {gameStatus === 'playing' && currentPhase === 'betting' && gameRound && (
+          <BettingPhase
+            roundId={gameRound.id}
+            playerId={playerId}
+            parentId={gameRound.parent_id}
+            players={players}
+            bets={bets}
+            onError={handleError}
+          />
+        )}
 
-            {isRolling && (
-              <div className="rolling-section">
-                <h2>サイコロを振っています...</h2>
-                <DiceDisplay dice={null} rolling={true} />
-              </div>
-            )}
+        {/* 親/子のロールフェーズ */}
+        {gameStatus === 'playing' &&
+          (currentPhase === 'parent_rolling' ||
+            currentPhase === 'children_rolling') &&
+          gameRound && (
+            <RollingPhase
+              roundId={gameRound.id}
+              playerId={playerId}
+              parentId={gameRound.parent_id}
+              currentTurnPlayerId={gameRound.current_turn_player_id}
+              phase={currentPhase}
+              players={players}
+              rolls={rolls}
+              parentHandType={gameRound.parent_hand_type}
+              onError={handleError}
+            />
+          )}
 
-            {myRoll && (
-              <div className="result-section">
-                <h2>あなたの結果</h2>
-                <DiceDisplay dice={[myRoll.dice1, myRoll.dice2, myRoll.dice3]} />
-                <div className="hand-result">
-                  <span className="hand-type">{myRoll.hand_type}</span>
-                  {myRoll.hand_value && (
-                    <span className="hand-value">値: {myRoll.hand_value}</span>
-                  )}
-                </div>
-                {rolls.length < players.length && (
-                  <p>他のプレイヤーを待っています...</p>
-                )}
-              </div>
-            )}
+        {/* 精算フェーズ */}
+        {gameStatus === 'playing' && currentPhase === 'settlement' && gameRound && (
+          <SettlementPhase
+            roundId={gameRound.id}
+            playerId={playerId}
+            parentId={gameRound.parent_id}
+            players={players}
+            rolls={rolls}
+            bets={bets}
+            parentHandType={gameRound.parent_hand_type}
+            isHost={isHost}
+            onError={handleError}
+          />
+        )}
 
-            {winner && (
-              <div className="winner-section">
-                <h2>🎉 勝者: {winner.name} 🎉</h2>
-                {isHost && (
-                  <button onClick={resetGame} className="reset-button">
-                    もう一度プレイ
-                  </button>
-                )}
-              </div>
-            )}
+        {/* ゲーム終了 */}
+        {gameStatus === 'finished' && (
+          <div className="game-finished-screen">
+            <h2>ゲーム終了!</h2>
+            <div className="final-standings">
+              <h3>最終結果</h3>
+              {[...players]
+                .sort((a, b) => b.chips - a.chips)
+                .map((p, index) => (
+                  <div key={p.id} className={`standing-item rank-${index + 1}`}>
+                    <span className="rank">#{index + 1}</span>
+                    <span className="standing-name">
+                      {p.name}
+                      {p.id === playerId && ' (あなた)'}
+                    </span>
+                    <span className="standing-chips">{p.chips} チップ</span>
+                  </div>
+                ))}
+            </div>
+            <button onClick={leaveRoom} className="leave-button large">
+              ロビーに戻る
+            </button>
           </div>
         )}
       </div>
@@ -392,4 +368,3 @@ function GameRoom({ roomId, playerId, isHost, playerName }) {
 }
 
 export default GameRoom
-
