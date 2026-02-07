@@ -58,17 +58,17 @@ export async function createRoom(
   playerName: string,
   roomName: string,
   maxPlayers: number = 4
-): Promise<{ roomId: string; playerId: string; roomName: string; isHost: boolean }> {
+): Promise<{ roomId: string; roomCode: string; playerId: string; roomName: string; isHost: boolean }> {
   return callEdgeFunction('create-room', { playerName, roomName, maxPlayers })
 }
 
 /**
- * ルームに参加する
+ * ルームに参加する（roomId は UUID または 6文字ルームコード）
  */
 export async function joinRoom(
   playerName: string,
   roomId: string
-): Promise<{ roomId: string; playerId: string; roomName: string; isHost: boolean }> {
+): Promise<{ roomId: string; roomCode: string; playerId: string; roomName: string; isHost: boolean }> {
   return callEdgeFunction('join-room', { playerName, roomId })
 }
 

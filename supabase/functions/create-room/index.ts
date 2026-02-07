@@ -2,6 +2,20 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
 import { getSupabaseAdmin } from '../_shared/supabaseAdmin.ts'
 
+/**
+ * 英数字6文字のルームコードを生成する
+ */
+function generateRoomCode(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  let code = ''
+  const array = new Uint32Array(6)
+  crypto.getRandomValues(array)
+  for (let i = 0; i < 6; i++) {
+    code += chars[array[i] % chars.length]
+  }
+  return code
+}
+
 serve(async (req: Request) => {
   // CORS プリフライト
   const corsResponse = handleCors(req)
@@ -28,6 +42,24 @@ serve(async (req: Request) => {
     const supabase = getSupabaseAdmin()
     const playerLimit = Math.min(Math.max(maxPlayers || 4, 2), 8)
 
+    // ユニークなルームコードを生成（衝突時はリトライ）
+    let roomCode = ''
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const candidate = generateRoomCode()
+      const { data: existing } = await supabase
+        .from('rooms')
+        .select('id')
+        .eq('room_code', candidate)
+        .maybeSingle()
+      if (!existing) {
+        roomCode = candidate
+        break
+      }
+    }
+    if (!roomCode) {
+      throw new Error('ルームコード生成に失敗しました。もう一度お試しください。')
+    }
+
     // ルームを作成
     const { data: roomData, error: roomError } = await supabase
       .from('rooms')
@@ -35,6 +67,7 @@ serve(async (req: Request) => {
         name: roomName.trim(),
         status: 'waiting',
         max_players: playerLimit,
+        room_code: roomCode,
       })
       .select()
       .single()
@@ -74,6 +107,7 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         roomId: roomData.id,
+        roomCode: roomCode,
         playerId: playerData.id,
         roomName: roomData.name,
         isHost: true,

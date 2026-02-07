@@ -27,12 +27,30 @@ serve(async (req: Request) => {
 
     const supabase = getSupabaseAdmin()
 
-    // ルームが存在するか確認
-    const { data: roomData, error: roomError } = await supabase
-      .from('rooms')
-      .select('*')
-      .eq('id', roomId)
-      .single()
+    // ルームコード（6文字英数字）またはUUIDで検索
+    const roomIdStr = String(roomId).trim().toUpperCase()
+    let roomData = null
+    let roomError = null
+
+    if (roomIdStr.length === 6 && /^[A-Z0-9]{6}$/.test(roomIdStr)) {
+      // 6文字英数字の場合、room_code で検索
+      const result = await supabase
+        .from('rooms')
+        .select('*')
+        .eq('room_code', roomIdStr)
+        .single()
+      roomData = result.data
+      roomError = result.error
+    } else {
+      // UUIDの場合、id で検索
+      const result = await supabase
+        .from('rooms')
+        .select('*')
+        .eq('id', roomId)
+        .single()
+      roomData = result.data
+      roomError = result.error
+    }
 
     if (roomError || !roomData) {
       return new Response(
@@ -52,7 +70,7 @@ serve(async (req: Request) => {
     const { count, error: countError } = await supabase
       .from('players')
       .select('*', { count: 'exact', head: true })
-      .eq('room_id', roomId)
+      .eq('room_id', roomData.id)
 
     if (countError) {
       throw new Error(`プレイヤー数取得エラー: ${countError.message}`)
@@ -69,7 +87,7 @@ serve(async (req: Request) => {
     const { data: playerData, error: playerError } = await supabase
       .from('players')
       .insert({
-        room_id: roomId,
+        room_id: roomData.id,
         name: playerName.trim(),
         is_host: false,
         is_ready: false,
@@ -84,6 +102,7 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         roomId: roomData.id,
+        roomCode: roomData.room_code,
         playerId: playerData.id,
         roomName: roomData.name,
         isHost: false,

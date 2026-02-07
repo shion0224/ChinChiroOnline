@@ -163,12 +163,14 @@ function Lobby({ user }: LobbyProps) {
           <div className="join-room">
             <h2>ルームに参加</h2>
             <label>
-              ルームID:
+              ルームコード:
               <input
                 type="text"
                 value={joinRoomId}
-                onChange={(e) => setJoinRoomId(e.target.value)}
-                placeholder="ルームIDを入力"
+                onChange={(e) => setJoinRoomId(e.target.value.toUpperCase())}
+                placeholder="6文字のコードを入力"
+                maxLength={6}
+                style={{ textTransform: 'uppercase' }}
               />
             </label>
             <button onClick={() => joinRoom()} disabled={loading}>
@@ -188,7 +190,7 @@ function Lobby({ user }: LobbyProps) {
                   <div className="room-info">
                     <span className="room-name">{room.name}</span>
                     <span className="room-id">
-                      ID: {room.id.substring(0, 8)}...
+                      ID: {room.room_code ?? room.id.substring(0, 8)}
                     </span>
                     <span className="room-player-count">
                       {room.players?.[0]?.count ?? 0}/{room.max_players}人

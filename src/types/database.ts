@@ -3,6 +3,7 @@
 export interface Room {
   id: string
   name: string
+  room_code: string | null
   host_id: string | null
   status: 'waiting' | 'playing' | 'finished'
   max_players: number

@@ -72,7 +72,7 @@ function GameRoom({
           <div className="room-info">
             <span>ルーム: {room?.name || 'Loading...'}</span>
             <span className="room-id">
-              ID: {roomId.substring(0, 8)}...
+              ID: {room?.room_code ?? roomId.substring(0, 8)}
             </span>
           </div>
           <button onClick={leaveRoom} className="leave-button">
