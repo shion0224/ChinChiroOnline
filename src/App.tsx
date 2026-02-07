@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { signInAnonymously } from './lib/auth'
 import Lobby from './components/Lobby'
 import './App.css'
+import type { User } from '@supabase/supabase-js'
 
 function App() {
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 

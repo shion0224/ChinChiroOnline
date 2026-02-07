@@ -1,7 +1,20 @@
 import { useState, useEffect } from 'react'
 import { rollDice as rollDiceApi } from '../lib/gameApi'
 import DiceDisplay from './DiceDisplay'
+import type { Player, PlayerRoll, RollDiceResponse } from '../types/database'
 import './RollingPhase.css'
+
+interface RollingPhaseProps {
+  roundId: string
+  playerId: string
+  parentId: string | null
+  currentTurnPlayerId: string | null
+  phase: 'parent_rolling' | 'children_rolling'
+  players: Player[]
+  rolls: PlayerRoll[]
+  parentHandType: string | null
+  onError?: (message: string) => void
+}
 
 function RollingPhase({
   roundId,
@@ -13,14 +26,14 @@ function RollingPhase({
   rolls,
   parentHandType,
   onError,
-}) {
+}: RollingPhaseProps) {
   const [isRolling, setIsRolling] = useState(false)
-  const [lastRollResult, setLastRollResult] = useState(null)
+  const [lastRollResult, setLastRollResult] = useState<RollDiceResponse | null>(
+    null
+  )
 
-  const isParent = playerId === parentId
   const isMyTurn = playerId === currentTurnPlayerId
   const currentTurnPlayer = players.find((p) => p.id === currentTurnPlayerId)
-  const parentPlayer = players.find((p) => p.id === parentId)
 
   // 自分のロール履歴
   const myRolls = rolls.filter((r) => r.player_id === playerId)
@@ -44,7 +57,7 @@ function RollingPhase({
       const result = await rollDiceApi(roundId, playerId)
       setLastRollResult(result)
     } catch (err) {
-      onError?.(err.message)
+      onError?.((err as Error).message)
     } finally {
       setIsRolling(false)
     }
@@ -69,9 +82,7 @@ function RollingPhase({
 
   return (
     <div className="rolling-phase">
-      <h2>
-        {phase === 'parent_rolling' ? '親のターン' : '子のターン'}
-      </h2>
+      <h2>{phase === 'parent_rolling' ? '親のターン' : '子のターン'}</h2>
 
       <div className="phase-info">
         {parentHandType && (
@@ -107,15 +118,15 @@ function RollingPhase({
                       lastRollResult.roll.dice3,
                     ]}
                   />
-                  <p className="hand-name">{lastRollResult.hand.displayName}</p>
+                  <p className="hand-name">
+                    {lastRollResult.hand.displayName}
+                  </p>
                   <p className="retry-message">
                     もう一度振れます（{lastRollResult.attempt}/3 回目）
                   </p>
                 </div>
               )}
-              <p className="attempt-info">
-                振り回数: {myAttempts}/3
-              </p>
+              <p className="attempt-info">振り回数: {myAttempts}/3</p>
               <button
                 className="roll-button"
                 onClick={handleRoll}
@@ -165,11 +176,14 @@ function RollingPhase({
             </span>
             {p.finalRoll ? (
               <span className="result-hand">
-                [{p.finalRoll.dice1}, {p.finalRoll.dice2}, {p.finalRoll.dice3}]{' '}
+                [{p.finalRoll.dice1}, {p.finalRoll.dice2},{' '}
+                {p.finalRoll.dice3}]{' '}
                 <strong>{p.finalRoll.hand_type}</strong>
               </span>
             ) : p.attempts > 0 ? (
-              <span className="result-rolling">振り中... ({p.attempts}/3)</span>
+              <span className="result-rolling">
+                振り中... ({p.attempts}/3)
+              </span>
             ) : (
               <span className="result-waiting">待機中</span>
             )}

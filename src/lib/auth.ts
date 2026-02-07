@@ -1,13 +1,20 @@
 import { supabase } from './supabase'
+import type { User, Session } from '@supabase/supabase-js'
+
+interface AuthResult {
+  user: User | null
+  session: Session | null
+}
 
 /**
  * 匿名認証でサインインする
  * 既にセッションがある場合はそのまま返す
- * @returns {Promise<{user: object, session: object}>}
  */
-export async function signInAnonymously() {
+export async function signInAnonymously(): Promise<AuthResult> {
   // 既存セッションを確認
-  const { data: { session } } = await supabase.auth.getSession()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
   if (session) {
     return { user: session.user, session }
   }
@@ -23,19 +30,21 @@ export async function signInAnonymously() {
 
 /**
  * 現在のユーザーを取得
- * @returns {Promise<object|null>}
  */
-export async function getCurrentUser() {
-  const { data: { user } } = await supabase.auth.getUser()
+export async function getCurrentUser(): Promise<User | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   return user
 }
 
 /**
  * 認証トークンを取得（Edge Function呼び出し用）
- * @returns {Promise<string>}
  */
-export async function getAuthToken() {
-  const { data: { session } } = await supabase.auth.getSession()
+export async function getAuthToken(): Promise<string> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
   if (!session) {
     throw new Error('認証されていません')
   }

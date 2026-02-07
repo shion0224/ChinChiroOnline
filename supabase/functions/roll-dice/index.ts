@@ -12,15 +12,17 @@ serve(async (req: Request) => {
   if (corsResponse) return corsResponse
 
   try {
-    const { playerId, gameRoundId } = await req.json()
+    const { playerId, roundId } = await req.json()
 
     // バリデーション
-    if (!playerId || !gameRoundId) {
+    if (!playerId || !roundId) {
       return new Response(
-        JSON.stringify({ error: 'playerId と gameRoundId が必要です' }),
+        JSON.stringify({ error: 'playerId と roundId が必要です' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    const gameRoundId = roundId
 
     const supabase = getSupabaseAdmin()
 

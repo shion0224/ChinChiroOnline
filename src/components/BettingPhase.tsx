@@ -1,8 +1,25 @@
 import { useState } from 'react'
 import { placeBet } from '../lib/gameApi'
+import type { Player, RoundBet } from '../types/database'
 import './BettingPhase.css'
 
-function BettingPhase({ roundId, playerId, parentId, players, bets, onError }) {
+interface BettingPhaseProps {
+  roundId: string
+  playerId: string
+  parentId: string | null
+  players: Player[]
+  bets: RoundBet[]
+  onError?: (message: string) => void
+}
+
+function BettingPhase({
+  roundId,
+  playerId,
+  parentId,
+  players,
+  bets,
+  onError,
+}: BettingPhaseProps) {
   const [betAmount, setBetAmount] = useState(100)
   const [isPlacing, setIsPlacing] = useState(false)
 
@@ -21,7 +38,7 @@ function BettingPhase({ roundId, playerId, parentId, players, bets, onError }) {
     try {
       await placeBet(roundId, playerId, betAmount)
     } catch (err) {
-      onError?.(err.message)
+      onError?.((err as Error).message)
     } finally {
       setIsPlacing(false)
     }
@@ -47,7 +64,9 @@ function BettingPhase({ roundId, playerId, parentId, players, bets, onError }) {
         </div>
       ) : myBet ? (
         <div className="bet-placed">
-          <p>ベット済み: <strong>{myBet.amount}</strong> チップ</p>
+          <p>
+            ベット済み: <strong>{myBet.amount}</strong> チップ
+          </p>
           <p>他のプレイヤーのベットを待っています...</p>
         </div>
       ) : (
@@ -71,7 +90,10 @@ function BettingPhase({ roundId, playerId, parentId, players, bets, onError }) {
                 step={10}
                 value={betAmount}
                 onChange={(e) => {
-                  const val = Math.min(maxBet, Math.max(10, Number(e.target.value)))
+                  const val = Math.min(
+                    maxBet,
+                    Math.max(10, Number(e.target.value))
+                  )
                   setBetAmount(val)
                 }}
               />
@@ -79,10 +101,18 @@ function BettingPhase({ roundId, playerId, parentId, players, bets, onError }) {
             </div>
           </div>
           <div className="quick-bets">
-            <button onClick={() => setBetAmount(Math.min(50, maxBet))}>50</button>
-            <button onClick={() => setBetAmount(Math.min(100, maxBet))}>100</button>
-            <button onClick={() => setBetAmount(Math.min(200, maxBet))}>200</button>
-            <button onClick={() => setBetAmount(Math.min(500, maxBet))}>500</button>
+            <button onClick={() => setBetAmount(Math.min(50, maxBet))}>
+              50
+            </button>
+            <button onClick={() => setBetAmount(Math.min(100, maxBet))}>
+              100
+            </button>
+            <button onClick={() => setBetAmount(Math.min(200, maxBet))}>
+              200
+            </button>
+            <button onClick={() => setBetAmount(Math.min(500, maxBet))}>
+              500
+            </button>
             <button onClick={() => setBetAmount(maxBet)}>ALL IN</button>
           </div>
           <button
@@ -103,7 +133,9 @@ function BettingPhase({ roundId, playerId, parentId, players, bets, onError }) {
             return (
               <div key={child.id} className="bet-item">
                 <span className="bet-player-name">{child.name}</span>
-                <span className={`bet-status ${childBet ? 'done' : 'waiting'}`}>
+                <span
+                  className={`bet-status ${childBet ? 'done' : 'waiting'}`}
+                >
                   {childBet ? `${childBet.amount} チップ` : '待機中...'}
                 </span>
               </div>

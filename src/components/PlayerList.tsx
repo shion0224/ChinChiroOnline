@@ -1,4 +1,14 @@
+import type { Player, PlayerRoll, RoundBet } from '../types/database'
 import './PlayerList.css'
+
+interface PlayerListProps {
+  players: Player[]
+  currentPlayerId: string
+  parentId?: string | null
+  currentTurnPlayerId?: string | null
+  rolls?: PlayerRoll[]
+  bets?: RoundBet[]
+}
 
 function PlayerList({
   players,
@@ -7,7 +17,7 @@ function PlayerList({
   currentTurnPlayerId,
   rolls,
   bets,
-}) {
+}: PlayerListProps) {
   return (
     <div className="player-list">
       <h3>プレイヤー</h3>
@@ -33,8 +43,12 @@ function PlayerList({
                     {isCurrentPlayer && ' (あなた)'}
                   </span>
                   <div className="player-badges">
-                    {player.is_host && <span className="badge host">HOST</span>}
-                    {isParent && <span className="badge parent-badge">親</span>}
+                    {player.is_host && (
+                      <span className="badge host">HOST</span>
+                    )}
+                    {isParent && (
+                      <span className="badge parent-badge">親</span>
+                    )}
                     {isCurrentTurn && (
                       <span className="badge turn-badge">ターン</span>
                     )}

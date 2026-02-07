@@ -1,6 +1,11 @@
 import './DiceDisplay.css'
 
-function DiceDisplay({ dice, rolling = false }) {
+interface DiceDisplayProps {
+  dice: number[] | null
+  rolling?: boolean
+}
+
+function DiceDisplay({ dice, rolling = false }: DiceDisplayProps) {
   if (!dice || dice.length !== 3) {
     return (
       <div className="dice-container">
@@ -11,7 +16,7 @@ function DiceDisplay({ dice, rolling = false }) {
     )
   }
 
-  const getDiceEmoji = (value) => {
+  const getDiceEmoji = (value: number): string => {
     const diceEmojis = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅']
     return diceEmojis[value - 1] || '?'
   }
@@ -29,4 +34,3 @@ function DiceDisplay({ dice, rolling = false }) {
 }
 
 export default DiceDisplay
-

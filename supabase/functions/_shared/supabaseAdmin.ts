@@ -20,3 +20,32 @@ export function getSupabaseAdmin() {
     },
   })
 }
+
+/**
+ * サービスロールキーを使用したSupabaseクライアント（エイリアス）
+ */
+export function createSupabaseAdmin() {
+  return getSupabaseAdmin()
+}
+
+/**
+ * ユーザーの認証トークンを使用したSupabaseクライアント
+ */
+export function createSupabaseClient(authHeader: string) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase environment variables')
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: { Authorization: authHeader },
+    },
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
+}

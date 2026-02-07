@@ -1,6 +1,24 @@
 import { useState, useEffect } from 'react'
 import { settleRound } from '../lib/gameApi'
+import type {
+  Player,
+  PlayerRoll,
+  RoundBet,
+  SettleRoundResponse,
+} from '../types/database'
 import './SettlementPhase.css'
+
+interface SettlementPhaseProps {
+  roundId: string
+  playerId: string
+  parentId: string | null
+  players: Player[]
+  rolls: PlayerRoll[]
+  bets: RoundBet[]
+  parentHandType: string | null
+  isHost: boolean
+  onError?: (message: string) => void
+}
 
 function SettlementPhase({
   roundId,
@@ -10,11 +28,10 @@ function SettlementPhase({
   rolls,
   bets,
   parentHandType,
-  isHost,
   onError,
-}) {
+}: SettlementPhaseProps) {
   const [isSettling, setIsSettling] = useState(false)
-  const [results, setResults] = useState(null)
+  const [results, setResults] = useState<SettleRoundResponse | null>(null)
   const [settled, setSettled] = useState(false)
 
   const parentPlayer = players.find((p) => p.id === parentId)
@@ -36,7 +53,7 @@ function SettlementPhase({
       setResults(data)
       setSettled(true)
     } catch (err) {
-      onError?.(err.message)
+      onError?.((err as Error).message)
     } finally {
       setIsSettling(false)
     }
@@ -65,7 +82,10 @@ function SettlementPhase({
           const isParent = p.id === parentId
 
           return (
-            <div key={p.id} className={`result-row ${isParent ? 'parent' : ''}`}>
+            <div
+              key={p.id}
+              className={`result-row ${isParent ? 'parent' : ''}`}
+            >
               <div className="result-player">
                 <span className="result-player-name">
                   {p.name}
@@ -109,7 +129,7 @@ function SettlementPhase({
         })}
       </div>
 
-      {/* 精算ボタン（ホストまたは誰でも） */}
+      {/* 精算ボタン */}
       {!settled && (
         <button
           className="settle-button"

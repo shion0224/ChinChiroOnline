@@ -1,17 +1,24 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { invokeEdgeFunction } from '../lib/edgeFunctions'
 import GameRoom from './GameRoom'
+import type { User } from '@supabase/supabase-js'
+import type { RoomWithPlayerCount } from '../types/database'
 import './Lobby.css'
 
-function Lobby({ user }) {
+interface LobbyProps {
+  user: User | null
+}
+
+function Lobby({ user }: LobbyProps) {
   const [playerName, setPlayerName] = useState('')
   const [roomName, setRoomName] = useState('')
-  const [roomId, setRoomId] = useState(null)
-  const [playerId, setPlayerId] = useState(null)
+  const [roomId, setRoomId] = useState<string | null>(null)
+  const [playerId, setPlayerId] = useState<string | null>(null)
   const [isHost, setIsHost] = useState(false)
   const [joinRoomId, setJoinRoomId] = useState('')
-  const [availableRooms, setAvailableRooms] = useState([])
+  const [availableRooms, setAvailableRooms] = useState<RoomWithPlayerCount[]>(
+    []
+  )
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -22,7 +29,8 @@ function Lobby({ user }) {
     // Realtime購読
     const channel = supabase
       .channel('rooms')
-      .on('postgres_changes',
+      .on(
+        'postgres_changes',
         { event: '*', schema: 'public', table: 'rooms' },
         () => {
           loadAvailableRooms()
@@ -45,7 +53,7 @@ function Lobby({ user }) {
         .limit(20)
 
       if (error) throw error
-      setAvailableRooms(data || [])
+      setAvailableRooms((data as RoomWithPlayerCount[]) || [])
     } catch (err) {
       console.error('Error loading rooms:', err)
     }
@@ -66,13 +74,16 @@ function Lobby({ user }) {
       setLoading(true)
 
       // Edge Function を呼び出してルーム作成
-      const { data, error: fnError } = await supabase.functions.invoke('create-room', {
-        body: {
-          playerName: playerName.trim(),
-          roomName: roomName.trim(),
-          maxPlayers: 4,
-        },
-      })
+      const { data, error: fnError } = await supabase.functions.invoke(
+        'create-room',
+        {
+          body: {
+            playerName: playerName.trim(),
+            roomName: roomName.trim(),
+            maxPlayers: 4,
+          },
+        }
+      )
 
       if (fnError) throw fnError
 
@@ -85,13 +96,13 @@ function Lobby({ user }) {
       setIsHost(true)
     } catch (err) {
       console.error('Error creating room:', err)
-      setError(err.message || 'ルームの作成に失敗しました')
+      setError((err as Error).message || 'ルームの作成に失敗しました')
     } finally {
       setLoading(false)
     }
   }
 
-  const joinRoom = async (targetRoomId = null) => {
+  const joinRoom = async (targetRoomId: string | null = null) => {
     if (!playerName.trim()) {
       setError('プレイヤー名を入力してください')
       return
@@ -108,12 +119,15 @@ function Lobby({ user }) {
       setLoading(true)
 
       // Edge Function を呼び出してルーム参加
-      const { data, error: fnError } = await supabase.functions.invoke('join-room', {
-        body: {
-          playerName: playerName.trim(),
-          roomId: roomToJoin,
-        },
-      })
+      const { data, error: fnError } = await supabase.functions.invoke(
+        'join-room',
+        {
+          body: {
+            playerName: playerName.trim(),
+            roomId: roomToJoin,
+          },
+        }
+      )
 
       if (fnError) throw fnError
 
@@ -126,7 +140,7 @@ function Lobby({ user }) {
       setIsHost(false)
     } catch (err) {
       console.error('Error joining room:', err)
-      setError(err.message || 'ルームへの参加に失敗しました')
+      setError((err as Error).message || 'ルームへの参加に失敗しました')
     } finally {
       setLoading(false)
     }
@@ -209,12 +223,19 @@ function Lobby({ user }) {
                 <div key={room.id} className="room-item">
                   <div className="room-info">
                     <span className="room-name">{room.name}</span>
-                    <span className="room-id">ID: {room.id.substring(0, 8)}...</span>
+                    <span className="room-id">
+                      ID: {room.id.substring(0, 8)}...
+                    </span>
                     <span className="room-player-count">
                       {room.players?.[0]?.count ?? 0}/{room.max_players}人
                     </span>
                   </div>
-                  <button onClick={() => joinRoom(room.id)} disabled={loading}>参加</button>
+                  <button
+                    onClick={() => joinRoom(room.id)}
+                    disabled={loading}
+                  >
+                    参加
+                  </button>
                 </div>
               ))}
             </div>
