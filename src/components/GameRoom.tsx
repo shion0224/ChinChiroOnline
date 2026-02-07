@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { useRealtimeGame } from '../hooks/useRealtimeGame'
-import { startGame as startGameApi, leaveRoom as leaveRoomApi } from '../lib/gameApi'
+import {
+  startGame as startGameApi,
+  leaveRoom as leaveRoomApi,
+  setChips as setChipsApi,
+} from '../lib/gameApi'
 import PlayerList from './PlayerList'
 import BettingPhase from './BettingPhase'
 import RollingPhase from './RollingPhase'
@@ -31,9 +35,12 @@ function GameRoom({
   } = useRealtimeGame(roomId, playerId)
 
   const [error, setError] = useState('')
+  const [chipInput, setChipInput] = useState(1000)
+  const [isSavingChips, setIsSavingChips] = useState(false)
 
   const isHost =
     players.find((p) => p.id === playerId)?.is_host ?? initialIsHost
+  const myPlayer = players.find((p) => p.id === playerId)
 
   const handleError = (message: string) => {
     setError(message)
@@ -95,6 +102,52 @@ function GameRoom({
           <div className="waiting-screen">
             <h2>ゲーム開始を待っています...</h2>
             <p>{players.length}人のプレイヤーが参加しています</p>
+
+            <div className="chips-setting">
+              <label>
+                持ち金額:
+                <input
+                  type="number"
+                  value={chipInput}
+                  onChange={(e) => setChipInput(Math.max(100, Number(e.target.value)))}
+                  min={100}
+                  max={1000000}
+                  step={100}
+                />
+              </label>
+              <div className="chips-presets">
+                {[500, 1000, 5000, 10000, 50000].map((v) => (
+                  <button
+                    key={v}
+                    className={chipInput === v ? 'active' : ''}
+                    onClick={() => setChipInput(v)}
+                  >
+                    {v.toLocaleString()}
+                  </button>
+                ))}
+              </div>
+              <button
+                className="save-chips-button"
+                onClick={async () => {
+                  setIsSavingChips(true)
+                  try {
+                    await setChipsApi(roomId, playerId, chipInput)
+                  } catch (err) {
+                    handleError((err as Error).message)
+                  } finally {
+                    setIsSavingChips(false)
+                  }
+                }}
+                disabled={isSavingChips || (myPlayer?.chips === chipInput)}
+              >
+                {isSavingChips
+                  ? '設定中...'
+                  : myPlayer?.chips === chipInput
+                    ? `${chipInput.toLocaleString()} チップ (設定済み)`
+                    : `${chipInput.toLocaleString()} チップに設定`}
+              </button>
+            </div>
+
             {players.length < 2 && (
               <p className="min-players-warning">
                 最低2人のプレイヤーが必要です

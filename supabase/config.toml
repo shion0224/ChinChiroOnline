@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.next-round]
 verify_jwt = false
+
+[functions.set-chips]
+verify_jwt = false

@@ -93,6 +93,17 @@ export async function leaveRoom(
 }
 
 /**
+ * 待機中にチップ額を設定する
+ */
+export async function setChips(
+  roomId: string,
+  playerId: string,
+  chips: number
+): Promise<{ success: boolean; playerId: string; chips: number }> {
+  return callEdgeFunction('set-chips', { roomId, playerId, chips })
+}
+
+/**
  * ベットを配置する（子プレイヤー用）
  */
 export async function placeBet(

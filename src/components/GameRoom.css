@@ -100,6 +100,82 @@
   margin-top: 1rem;
 }
 
+.chips-setting {
+  margin: 1.5rem 0;
+  padding: 1.2rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.chips-setting label {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-weight: 500;
+  margin-bottom: 0.8rem;
+}
+
+.chips-setting input[type="number"] {
+  width: 140px;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #eee;
+  font-size: 1rem;
+  text-align: right;
+}
+
+.chips-presets {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.8rem;
+}
+
+.chips-presets button {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ccc;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.chips-presets button:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.chips-presets button.active {
+  background: rgba(79, 195, 247, 0.2);
+  border-color: #4fc3f7;
+  color: #4fc3f7;
+}
+
+.save-chips-button {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.save-chips-button:hover:not(:disabled) {
+  box-shadow: 0 4px 15px rgba(79, 195, 247, 0.3);
+}
+
+.save-chips-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .start-button {
   margin-top: 2rem;
   padding: 1rem 2.5rem;
