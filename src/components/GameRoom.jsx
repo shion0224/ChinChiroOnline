@@ -1,235 +1,155 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { startGame } from '../lib/gameApi'
-import BettingPhase from './BettingPhase'
-import RollingPhase from './RollingPhase'
-import SettlementPhase from './SettlementPhase'
+import { useRealtimeGame } from '../hooks/useRealtimeGame'
+import DiceDisplay from './DiceDisplay'
 import PlayerList from './PlayerList'
 import './GameRoom.css'
 
-function GameRoom({ roomId, playerId, isHost, playerName }) {
-  const [players, setPlayers] = useState([])
-  const [gameRound, setGameRound] = useState(null)
-  const [rolls, setRolls] = useState([])
-  const [bets, setBets] = useState([])
-  const [room, setRoom] = useState(null)
-  const [gameStatus, setGameStatus] = useState('waiting')
+function GameRoom({ roomId, playerId, isHost: initialIsHost, playerName }) {
+  const {
+    room,
+    players,
+    gameRound,
+    rolls,
+    gameStatus,
+    setGameRound,
+    setRolls,
+    setGameStatus,
+  } = useRealtimeGame(roomId, playerId)
+
+  const [myRoll, setMyRoll] = useState(null)
+  const [isRolling, setIsRolling] = useState(false)
+  const [winner, setWinner] = useState(null)
   const [error, setError] = useState('')
 
-  // ---- データ読み込み関数 ----
+  // 現在のプレイヤーがホストかどうかを動的に判定
+  const isHost = players.find((p) => p.id === playerId)?.is_host ?? initialIsHost
 
-  const loadRoomData = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('rooms')
-      .select('*')
-      .eq('id', roomId)
-      .single()
-
-    if (!error && data) {
-      setRoom(data)
-      setGameStatus(data.status)
-    }
-  }, [roomId])
-
-  const loadPlayers = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('players')
-      .select('*')
-      .eq('room_id', roomId)
-      .order('turn_order', { ascending: true })
-
-    if (!error && data) {
-      setPlayers(data)
-    }
-  }, [roomId])
-
-  const loadCurrentRound = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('game_rounds')
-      .select('*')
-      .eq('room_id', roomId)
-      .eq('status', 'playing')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (!error && data) {
-      setGameRound(data)
-    } else {
-      setGameRound(null)
-    }
-  }, [roomId])
-
-  const loadRolls = useCallback(async () => {
-    if (!gameRound) {
-      setRolls([])
-      return
-    }
-
-    const { data, error } = await supabase
-      .from('player_rolls')
-      .select('*')
-      .eq('game_round_id', gameRound.id)
-      .order('rolled_at', { ascending: true })
-
-    if (!error && data) {
-      setRolls(data)
-    }
-  }, [gameRound])
-
-  const loadBets = useCallback(async () => {
-    if (!gameRound) {
-      setBets([])
-      return
-    }
-
-    const { data, error } = await supabase
-      .from('round_bets')
-      .select('*')
-      .eq('game_round_id', gameRound.id)
-
-    if (!error && data) {
-      setBets(data)
-    }
-  }, [gameRound])
-
-  // ---- 初期読み込み ----
-
+  // rollsが変更されたら自分のロール結果を更新
   useEffect(() => {
-    loadRoomData()
-    loadPlayers()
-  }, [loadRoomData, loadPlayers])
-
-  // ゲームが playing の時にラウンドを読み込む
-  useEffect(() => {
-    if (gameStatus === 'playing') {
-      loadCurrentRound()
-    }
-  }, [gameStatus, loadCurrentRound])
-
-  // ラウンドが変わったらロールとベットを読み込む
-  useEffect(() => {
-    if (gameRound) {
-      loadRolls()
-      loadBets()
-    } else {
-      setRolls([])
-      setBets([])
-    }
-  }, [gameRound, loadRolls, loadBets])
-
-  // ---- Realtime サブスクリプション ----
-
-  useEffect(() => {
-    // ルーム状態の監視
-    const roomChannel = supabase
-      .channel(`room-${roomId}-room`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` },
-        () => {
-          loadRoomData()
-        }
-      )
-      .subscribe()
-
-    // プレイヤーの参加/退出/更新の監視
-    const playersChannel = supabase
-      .channel(`room-${roomId}-players`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` },
-        () => {
-          loadPlayers()
-        }
-      )
-      .subscribe()
-
-    // ゲームラウンドの監視
-    const roundsChannel = supabase
-      .channel(`room-${roomId}-rounds`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'game_rounds', filter: `room_id=eq.${roomId}` },
-        () => {
-          loadCurrentRound()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(roomChannel)
-      supabase.removeChannel(playersChannel)
-      supabase.removeChannel(roundsChannel)
-      // クリーンアップ時にプレイヤーを削除
-      if (playerId) {
-        supabase.from('players').delete().eq('id', playerId).then(() => {})
+    if (rolls.length > 0) {
+      const myRollData = rolls.find((r) => r.player_id === playerId)
+      if (myRollData) {
+        setMyRoll(myRollData)
       }
     }
-  }, [roomId, playerId, loadRoomData, loadPlayers, loadCurrentRound])
+  }, [rolls, playerId])
 
-  // ロールの監視（ラウンドが変わるたびに再購読）
+  // ゲームラウンドが finished になったら勝者を取得
   useEffect(() => {
-    if (!gameRound) return
-
-    const rollsChannel = supabase
-      .channel(`room-${roomId}-rolls-${gameRound.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'player_rolls',
-          filter: `game_round_id=eq.${gameRound.id}`,
-        },
-        () => {
-          loadRolls()
-        }
+    if (gameRound?.status === 'finished' && gameRound?.winner_player_id) {
+      const winnerPlayer = players.find(
+        (p) => p.id === gameRound.winner_player_id
       )
-      .subscribe()
-
-    const betsChannel = supabase
-      .channel(`room-${roomId}-bets-${gameRound.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'round_bets',
-          filter: `game_round_id=eq.${gameRound.id}`,
-        },
-        () => {
-          loadBets()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(rollsChannel)
-      supabase.removeChannel(betsChannel)
+      if (winnerPlayer) {
+        setWinner(winnerPlayer)
+      }
     }
-  }, [roomId, gameRound, loadRolls, loadBets])
+  }, [gameRound, players])
 
-  // ---- アクション ----
-
-  const handleStartGame = async () => {
+  // ゲーム開始（ホストのみ）
+  const startGame = async () => {
     if (!isHost) return
 
     try {
       setError('')
-      await startGame(roomId, playerId)
+
+      const { data, error: fnError } = await supabase.functions.invoke(
+        'start-game',
+        {
+          body: { playerId, roomId },
+        }
+      )
+
+      if (fnError) throw fnError
+
+      if (data.error) {
+        throw new Error(data.error)
+      }
     } catch (err) {
       console.error('Error starting game:', err)
-      setError(err.message || 'ゲーム開始に失敗しました')
+      setError(err.message || 'ゲームの開始に失敗しました')
     }
   }
 
-  const handleError = (message) => {
-    setError(message)
-    setTimeout(() => setError(''), 5000)
+  // サイコロを振る（Edge Function経由）
+  const rollDice = async () => {
+    if (!gameRound || myRoll || isRolling) return
+
+    setIsRolling(true)
+    setError('')
+
+    // サイコロを振るアニメーションのため少し待つ
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke(
+        'roll-dice',
+        {
+          body: { playerId, gameRoundId: gameRound.id },
+        }
+      )
+
+      if (fnError) throw fnError
+
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      // サーバーから返された結果をセット
+      setMyRoll({
+        dice1: data.roll.dice[0],
+        dice2: data.roll.dice[1],
+        dice3: data.roll.dice[2],
+        hand_type: data.roll.handType,
+        hand_value: data.roll.handValue,
+      })
+
+      // 全員振り終わって勝者が決定された場合
+      if (data.allRolled && data.winner) {
+        setWinner(data.winner)
+      }
+    } catch (err) {
+      console.error('Error rolling dice:', err)
+      setError(err.message || 'サイコロを振るのに失敗しました')
+    } finally {
+      setIsRolling(false)
+    }
   }
 
-  const leaveRoom = () => {
+  // もう一度プレイ（ホストのみ）
+  const resetGame = async () => {
+    if (!isHost) return
+
+    try {
+      setError('')
+
+      // ルームを待機状態に戻す
+      await supabase
+        .from('rooms')
+        .update({ status: 'waiting' })
+        .eq('id', roomId)
+
+      setMyRoll(null)
+      setWinner(null)
+      setRolls([])
+      setGameRound(null)
+      setGameStatus('waiting')
+    } catch (err) {
+      console.error('Error resetting game:', err)
+      setError(err.message || 'ゲームのリセットに失敗しました')
+    }
+  }
+
+  // ルームから退出
+  const leaveRoom = async () => {
+    try {
+      await supabase.functions.invoke('leave-room', {
+        body: { playerId, roomId },
+      })
+    } catch (err) {
+      console.error('Error leaving room:', err)
+    }
     window.location.reload()
   }
 
@@ -245,20 +165,22 @@ function GameRoom({ roomId, playerId, isHost, playerName }) {
           <h1>チンチロオンライン</h1>
           <div className="room-info">
             <span>ルーム: {room?.name || 'Loading...'}</span>
-            <span className="room-id">ID: {roomId.substring(0, 8)}...</span>
-            {gameRound && (
-              <span className="round-number">
-                ラウンド {gameRound.round_number}
-              </span>
-            )}
+            <span className="room-id">
+              ID: {roomId.substring(0, 8)}...
+            </span>
           </div>
           <button onClick={leaveRoom} className="leave-button">
             退出
           </button>
         </div>
 
-        {/* エラー表示 */}
         {error && <div className="error-message">{error}</div>}
+
+        <PlayerList
+          players={players}
+          currentPlayerId={playerId}
+          rolls={rolls}
+        />
 
         {/* プレイヤーリスト */}
         <PlayerList
@@ -323,20 +245,25 @@ function GameRoom({ roomId, playerId, isHost, playerName }) {
             />
           )}
 
-        {/* 精算フェーズ */}
-        {gameStatus === 'playing' && currentPhase === 'settlement' && gameRound && (
-          <SettlementPhase
-            roundId={gameRound.id}
-            playerId={playerId}
-            parentId={gameRound.parent_id}
-            players={players}
-            rolls={rolls}
-            bets={bets}
-            parentHandType={gameRound.parent_hand_type}
-            isHost={isHost}
-            onError={handleError}
-          />
-        )}
+            {myRoll && (
+              <div className="result-section">
+                <h2>あなたの結果</h2>
+                <DiceDisplay
+                  dice={[myRoll.dice1, myRoll.dice2, myRoll.dice3]}
+                />
+                <div className="hand-result">
+                  <span className="hand-type">{myRoll.hand_type}</span>
+                  {myRoll.hand_value > 0 && (
+                    <span className="hand-value">
+                      値: {myRoll.hand_value}
+                    </span>
+                  )}
+                </div>
+                {!winner && rolls.length < players.length && (
+                  <p>他のプレイヤーを待っています...</p>
+                )}
+              </div>
+            )}
 
         {/* ゲーム終了 */}
         {gameStatus === 'finished' && (

@@ -1,37 +1,22 @@
-import { createClient } from "@supabase/supabase-js";
-
 /**
- * Service Role キーを使ったSupabaseクライアント（サーバー側専用）
- * RLSをバイパスして全テーブルに直接アクセスできる
+ * Supabase Admin クライアント（サービスロール）
+ * Edge Functions 内で DB 操作を行うために使用
  */
-export function createSupabaseAdmin() {
-  return createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
-}
 
-/**
- * リクエストのJWTからユーザーIDを取得するためのクライアント
- */
-export function createSupabaseClient(authHeader: string) {
-  return createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-    {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+export function getSupabaseAdmin() {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    throw new Error('Missing Supabase environment variables')
+  }
+
+  return createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
 }

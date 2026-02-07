@@ -13,7 +13,7 @@ function Lobby({ user }) {
   const [joinRoomId, setJoinRoomId] = useState('')
   const [availableRooms, setAvailableRooms] = useState([])
   const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   // 利用可能なルームを取得（SELECT は認証ユーザーに許可済み）
   useEffect(() => {
@@ -63,21 +63,31 @@ function Lobby({ user }) {
 
     try {
       setError('')
-      setIsLoading(true)
+      setLoading(true)
 
-      const data = await invokeEdgeFunction('create-room', {
-        room_name: roomName,
-        player_name: playerName,
+      // Edge Function を呼び出してルーム作成
+      const { data, error: fnError } = await supabase.functions.invoke('create-room', {
+        body: {
+          playerName: playerName.trim(),
+          roomName: roomName.trim(),
+          maxPlayers: 4,
+        },
       })
 
-      setRoomId(data.room.id)
-      setPlayerId(data.player.id)
+      if (fnError) throw fnError
+
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      setRoomId(data.roomId)
+      setPlayerId(data.playerId)
       setIsHost(true)
     } catch (err) {
       console.error('Error creating room:', err)
       setError(err.message || 'ルームの作成に失敗しました')
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
@@ -95,21 +105,30 @@ function Lobby({ user }) {
 
     try {
       setError('')
-      setIsLoading(true)
+      setLoading(true)
 
-      const data = await invokeEdgeFunction('join-room', {
-        room_id: roomToJoin,
-        player_name: playerName,
+      // Edge Function を呼び出してルーム参加
+      const { data, error: fnError } = await supabase.functions.invoke('join-room', {
+        body: {
+          playerName: playerName.trim(),
+          roomId: roomToJoin,
+        },
       })
 
-      setRoomId(data.room.id)
-      setPlayerId(data.player.id)
+      if (fnError) throw fnError
+
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      setRoomId(data.roomId)
+      setPlayerId(data.playerId)
       setIsHost(false)
     } catch (err) {
       console.error('Error joining room:', err)
       setError(err.message || 'ルームへの参加に失敗しました')
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
@@ -158,8 +177,8 @@ function Lobby({ user }) {
                 maxLength={30}
               />
             </label>
-            <button onClick={createRoom} disabled={isLoading}>
-              {isLoading ? '作成中...' : 'ルームを作成'}
+            <button onClick={createRoom} disabled={loading}>
+              {loading ? '作成中...' : 'ルームを作成'}
             </button>
           </div>
 
@@ -174,8 +193,8 @@ function Lobby({ user }) {
                 placeholder="ルームIDを入力"
               />
             </label>
-            <button onClick={() => joinRoom()} disabled={isLoading}>
-              {isLoading ? '参加中...' : '参加'}
+            <button onClick={() => joinRoom()} disabled={loading}>
+              {loading ? '参加中...' : '参加'}
             </button>
           </div>
         </div>
@@ -195,7 +214,7 @@ function Lobby({ user }) {
                       {room.players?.[0]?.count ?? 0}/{room.max_players}人
                     </span>
                   </div>
-                  <button onClick={() => joinRoom(room.id)} disabled={isLoading}>参加</button>
+                  <button onClick={() => joinRoom(room.id)} disabled={loading}>参加</button>
                 </div>
               ))}
             </div>

@@ -1,124 +1,90 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { corsHeaders } from "../_shared/cors.ts";
-import {
-  createSupabaseAdmin,
-  createSupabaseClient,
-} from "../_shared/supabaseAdmin.ts";
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { corsHeaders, handleCors } from '../_shared/cors.ts'
+import { getSupabaseAdmin } from '../_shared/supabaseAdmin.ts'
 
-/**
- * create-room Edge Function
- *
- * ルーム作成 + ホストプレイヤー登録
- *
- * リクエストボディ:
- *   { room_name: string, player_name: string, max_players?: number }
- *
- * レスポンス:
- *   { room: object, player: object }
- */
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+serve(async (req: Request) => {
+  // CORS プリフライト
+  const corsResponse = handleCors(req)
+  if (corsResponse) return corsResponse
 
   try {
-    // 認証チェック
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    const { playerName, roomName, maxPlayers } = await req.json()
+
+    // バリデーション
+    if (!playerName || typeof playerName !== 'string' || !playerName.trim()) {
       return new Response(
-        JSON.stringify({ error: "認証が必要です" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+        JSON.stringify({ error: 'プレイヤー名を入力してください' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    const supabaseClient = createSupabaseClient(authHeader);
-    const {
-      data: { user },
-    } = await supabaseClient.auth.getUser();
-
-    if (!user) {
+    if (!roomName || typeof roomName !== 'string' || !roomName.trim()) {
       return new Response(
-        JSON.stringify({ error: "認証に失敗しました" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+        JSON.stringify({ error: 'ルーム名を入力してください' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    // リクエスト解析
-    const { room_name, player_name, max_players = 4 } = await req.json();
+    const supabase = getSupabaseAdmin()
+    const playerLimit = Math.min(Math.max(maxPlayers || 4, 2), 8)
 
-    if (!room_name?.trim()) {
-      return new Response(
-        JSON.stringify({ error: "ルーム名を入力してください" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!player_name?.trim()) {
-      return new Response(
-        JSON.stringify({ error: "プレイヤー名を入力してください" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const supabaseAdmin = createSupabaseAdmin();
-
-    // ルーム作成
-    const { data: room, error: roomError } = await supabaseAdmin
-      .from("rooms")
+    // ルームを作成
+    const { data: roomData, error: roomError } = await supabase
+      .from('rooms')
       .insert({
-        name: room_name.trim(),
-        status: "waiting",
-        max_players: Math.min(Math.max(max_players, 2), 8),
+        name: roomName.trim(),
+        status: 'waiting',
+        max_players: playerLimit,
       })
       .select()
-      .single();
+      .single()
 
     if (roomError) {
-      return new Response(
-        JSON.stringify({ error: `ルーム作成に失敗: ${roomError.message}` }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      throw new Error(`ルーム作成エラー: ${roomError.message}`)
     }
 
-    // ホストプレイヤー作成
-    const { data: player, error: playerError } = await supabaseAdmin
-      .from("players")
+    // ホストプレイヤーを作成
+    const { data: playerData, error: playerError } = await supabase
+      .from('players')
       .insert({
-        room_id: room.id,
-        name: player_name.trim(),
-        user_id: user.id,
+        room_id: roomData.id,
+        name: playerName.trim(),
         is_host: true,
         is_ready: false,
       })
       .select()
-      .single();
+      .single()
 
     if (playerError) {
-      // ロールバック: ルームを削除
-      await supabaseAdmin.from("rooms").delete().eq("id", room.id);
-      return new Response(
-        JSON.stringify({ error: `プレイヤー作成に失敗: ${playerError.message}` }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      // プレイヤー作成失敗時、ルームを削除
+      await supabase.from('rooms').delete().eq('id', roomData.id)
+      throw new Error(`プレイヤー作成エラー: ${playerError.message}`)
     }
 
     // ルームの host_id を更新
-    await supabaseAdmin
-      .from("rooms")
-      .update({ host_id: player.id })
-      .eq("id", room.id);
+    const { error: updateError } = await supabase
+      .from('rooms')
+      .update({ host_id: playerData.id })
+      .eq('id', roomData.id)
+
+    if (updateError) {
+      throw new Error(`ルーム更新エラー: ${updateError.message}`)
+    }
 
     return new Response(
-      JSON.stringify({ room, player }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
-  } catch (err) {
+      JSON.stringify({
+        roomId: roomData.id,
+        playerId: playerData.id,
+        roomName: roomData.name,
+        isHost: true,
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'ルームの作成に失敗しました'
     return new Response(
-      JSON.stringify({ error: `サーバーエラー: ${(err as Error).message}` }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+      JSON.stringify({ error: message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
   }
-});
+})
