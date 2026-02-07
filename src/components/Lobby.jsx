@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { invokeEdgeFunction } from '../lib/edgeFunctions'
 import GameRoom from './GameRoom'
 import './Lobby.css'
 
-function Lobby() {
+function Lobby({ user }) {
   const [playerName, setPlayerName] = useState('')
   const [roomName, setRoomName] = useState('')
   const [roomId, setRoomId] = useState(null)
@@ -12,15 +13,16 @@ function Lobby() {
   const [joinRoomId, setJoinRoomId] = useState('')
   const [availableRooms, setAvailableRooms] = useState([])
   const [error, setError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
-  // 利用可能なルームを取得
+  // 利用可能なルームを取得（SELECT は認証ユーザーに許可済み）
   useEffect(() => {
     loadAvailableRooms()
 
     // Realtime購読
     const channel = supabase
       .channel('rooms')
-      .on('postgres_changes', 
+      .on('postgres_changes',
         { event: '*', schema: 'public', table: 'rooms' },
         () => {
           loadAvailableRooms()
@@ -37,7 +39,7 @@ function Lobby() {
     try {
       const { data, error } = await supabase
         .from('rooms')
-        .select('*')
+        .select('*, players:players(count)')
         .eq('status', 'waiting')
         .order('created_at', { ascending: false })
         .limit(20)
@@ -61,45 +63,21 @@ function Lobby() {
 
     try {
       setError('')
+      setIsLoading(true)
 
-      // ルームを作成
-      const { data: roomData, error: roomError } = await supabase
-        .from('rooms')
-        .insert({
-          name: roomName,
-          status: 'waiting'
-        })
-        .select()
-        .single()
+      const data = await invokeEdgeFunction('create-room', {
+        room_name: roomName,
+        player_name: playerName,
+      })
 
-      if (roomError) throw roomError
-
-      // プレイヤーを作成（ホスト）
-      const { data: playerData, error: playerError } = await supabase
-        .from('players')
-        .insert({
-          room_id: roomData.id,
-          name: playerName,
-          is_host: true,
-          is_ready: false
-        })
-        .select()
-        .single()
-
-      if (playerError) throw playerError
-
-      // ルームのhost_idを更新
-      await supabase
-        .from('rooms')
-        .update({ host_id: playerData.id })
-        .eq('id', roomData.id)
-
-      setRoomId(roomData.id)
-      setPlayerId(playerData.id)
+      setRoomId(data.room.id)
+      setPlayerId(data.player.id)
       setIsHost(true)
     } catch (err) {
       console.error('Error creating room:', err)
       setError(err.message || 'ルームの作成に失敗しました')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -117,54 +95,41 @@ function Lobby() {
 
     try {
       setError('')
+      setIsLoading(true)
 
-      // ルームが存在するか確認
-      const { data: roomData, error: roomError } = await supabase
-        .from('rooms')
-        .select('*')
-        .eq('id', roomToJoin)
-        .single()
+      const data = await invokeEdgeFunction('join-room', {
+        room_id: roomToJoin,
+        player_name: playerName,
+      })
 
-      if (roomError || !roomData) {
-        throw new Error('ルームが見つかりません')
-      }
-
-      if (roomData.status !== 'waiting') {
-        throw new Error('このルームは既に開始されています')
-      }
-
-      // プレイヤーを追加
-      const { data: playerData, error: playerError } = await supabase
-        .from('players')
-        .insert({
-          room_id: roomToJoin,
-          name: playerName,
-          is_host: false,
-          is_ready: false
-        })
-        .select()
-        .single()
-
-      if (playerError) throw playerError
-
-      setRoomId(roomToJoin)
-      setPlayerId(playerData.id)
+      setRoomId(data.room.id)
+      setPlayerId(data.player.id)
       setIsHost(false)
     } catch (err) {
       console.error('Error joining room:', err)
       setError(err.message || 'ルームへの参加に失敗しました')
+    } finally {
+      setIsLoading(false)
     }
   }
 
   if (roomId && playerId) {
-    return <GameRoom roomId={roomId} playerId={playerId} isHost={isHost} playerName={playerName} />
+    return (
+      <GameRoom
+        roomId={roomId}
+        playerId={playerId}
+        isHost={isHost}
+        playerName={playerName}
+        user={user}
+      />
+    )
   }
 
   return (
     <div className="lobby">
       <div className="lobby-container">
-        <h1>🎲 チンチロオンライン</h1>
-        
+        <h1>チンチロオンライン</h1>
+
         <div className="player-name-section">
           <label>
             プレイヤー名:
@@ -193,7 +158,9 @@ function Lobby() {
                 maxLength={30}
               />
             </label>
-            <button onClick={createRoom}>ルームを作成</button>
+            <button onClick={createRoom} disabled={isLoading}>
+              {isLoading ? '作成中...' : 'ルームを作成'}
+            </button>
           </div>
 
           <div className="join-room">
@@ -207,7 +174,9 @@ function Lobby() {
                 placeholder="ルームIDを入力"
               />
             </label>
-            <button onClick={() => joinRoom()}>参加</button>
+            <button onClick={() => joinRoom()} disabled={isLoading}>
+              {isLoading ? '参加中...' : '参加'}
+            </button>
           </div>
         </div>
 
@@ -222,8 +191,11 @@ function Lobby() {
                   <div className="room-info">
                     <span className="room-name">{room.name}</span>
                     <span className="room-id">ID: {room.id.substring(0, 8)}...</span>
+                    <span className="room-player-count">
+                      {room.players?.[0]?.count ?? 0}/{room.max_players}人
+                    </span>
                   </div>
-                  <button onClick={() => joinRoom(room.id)}>参加</button>
+                  <button onClick={() => joinRoom(room.id)} disabled={isLoading}>参加</button>
                 </div>
               ))}
             </div>
@@ -235,4 +207,3 @@ function Lobby() {
 }
 
 export default Lobby
-

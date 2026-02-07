@@ -194,6 +194,32 @@
   background: #5568d3;
 }
 
+.round-info {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #667eea;
+}
+
+.info-text {
+  color: #999;
+  font-size: 0.875rem;
+  margin-top: 1rem;
+}
+
+.error-message {
+  background: #fee;
+  color: #c33;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  border: 1px solid #fcc;
+}
+
+.my-final-result {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
 @media (max-width: 768px) {
   .game-header {
     flex-direction: column;

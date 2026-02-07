@@ -1,0 +1,15 @@
+[project]
+id = ""
+
+[api]
+port = 54321
+schemas = ["public"]
+
+[db]
+port = 54322
+
+[studio]
+port = 54323
+
+[functions]
+verify_jwt = true

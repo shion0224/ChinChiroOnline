@@ -3,12 +3,12 @@ import './PlayerList.css'
 function PlayerList({ players, currentPlayerId, rolls }) {
   return (
     <div className="player-list">
-      <h3>プレイヤー</h3>
+      <h3>プレイヤー ({players.length}人)</h3>
       <div className="players">
         {players.map((player) => {
           const playerRoll = rolls.find(r => r.player_id === player.id)
           const isCurrentPlayer = player.id === currentPlayerId
-          
+
           return (
             <div
               key={player.id}
@@ -17,12 +17,13 @@ function PlayerList({ players, currentPlayerId, rolls }) {
               <div className="player-info">
                 <span className="player-name">
                   {player.name}
-                  {player.is_host && ' 👑'}
+                  {player.is_host && ' [HOST]'}
+                  {isCurrentPlayer && ' (あなた)'}
                 </span>
                 {playerRoll && (
                   <div className="player-result">
                     <span className="hand-type">{playerRoll.hand_type}</span>
-                    {playerRoll.hand_value && (
+                    {playerRoll.hand_value > 0 && (
                       <span className="hand-value">({playerRoll.hand_value})</span>
                     )}
                   </div>
@@ -35,7 +36,7 @@ function PlayerList({ players, currentPlayerId, rolls }) {
                   ))}
                 </div>
               )}
-              {!playerRoll && (
+              {!playerRoll && rolls.length > 0 && (
                 <div className="waiting">待機中...</div>
               )}
             </div>
@@ -47,4 +48,3 @@ function PlayerList({ players, currentPlayerId, rolls }) {
 }
 
 export default PlayerList
-
