@@ -20,7 +20,7 @@ function BettingPhase({
   bets,
   onError,
 }: BettingPhaseProps) {
-  const [betAmount, setBetAmount] = useState(100)
+  const [betAmount, setBetAmount] = useState(1)
   const [isPlacing, setIsPlacing] = useState(false)
 
   const isParent = playerId === parentId
@@ -76,42 +76,42 @@ function BettingPhase({
             <input
               id="betAmount"
               type="range"
-              min={10}
+              min={1}
               max={maxBet}
-              step={10}
+              step={1}
               value={betAmount}
               onChange={(e) => setBetAmount(Number(e.target.value))}
             />
             <div className="bet-amount-display">
               <input
                 type="number"
-                min={10}
+                min={1}
                 max={maxBet}
-                step={10}
+                step={1}
                 value={betAmount}
                 onChange={(e) => {
                   const val = Math.min(
                     maxBet,
-                    Math.max(10, Number(e.target.value))
+                    Math.max(1, Number(e.target.value))
                   )
                   setBetAmount(val)
                 }}
               />
-              <span>/ {maxBet} チップ</span>
+              <span>/ {maxBet.toLocaleString()} チップ</span>
             </div>
           </div>
           <div className="quick-bets">
-            <button onClick={() => setBetAmount(Math.min(50, maxBet))}>
-              50
+            <button onClick={() => setBetAmount(Math.max(1, Math.floor(maxBet * 0.1)))}>
+              10%
             </button>
-            <button onClick={() => setBetAmount(Math.min(100, maxBet))}>
-              100
+            <button onClick={() => setBetAmount(Math.max(1, Math.floor(maxBet * 0.25)))}>
+              25%
             </button>
-            <button onClick={() => setBetAmount(Math.min(200, maxBet))}>
-              200
+            <button onClick={() => setBetAmount(Math.max(1, Math.floor(maxBet * 0.5)))}>
+              50%
             </button>
-            <button onClick={() => setBetAmount(Math.min(500, maxBet))}>
-              500
+            <button onClick={() => setBetAmount(Math.max(1, Math.floor(maxBet * 0.75)))}>
+              75%
             </button>
             <button onClick={() => setBetAmount(maxBet)}>ALL IN</button>
           </div>
@@ -120,7 +120,7 @@ function BettingPhase({
             onClick={handlePlaceBet}
             disabled={isPlacing || betAmount <= 0 || betAmount > maxBet}
           >
-            {isPlacing ? 'ベット中...' : `${betAmount} チップをベット`}
+            {isPlacing ? 'ベット中...' : `${betAmount.toLocaleString()} チップをベット`}
           </button>
         </div>
       )}
