@@ -1,43 +1,88 @@
 import './PlayerList.css'
 
-function PlayerList({ players, currentPlayerId, rolls }) {
+function PlayerList({
+  players,
+  currentPlayerId,
+  parentId,
+  currentTurnPlayerId,
+  rolls,
+  bets,
+}) {
   return (
     <div className="player-list">
-      <h3>プレイヤー ({players.length}人)</h3>
+      <h3>プレイヤー</h3>
       <div className="players">
         {players.map((player) => {
-          const playerRoll = rolls.find(r => r.player_id === player.id)
           const isCurrentPlayer = player.id === currentPlayerId
+          const isParent = player.id === parentId
+          const isCurrentTurn = player.id === currentTurnPlayerId
+          const playerBet = bets?.find((b) => b.player_id === player.id)
+          const playerFinalRoll = rolls?.find(
+            (r) => r.player_id === player.id && r.is_final
+          )
 
           return (
             <div
               key={player.id}
-              className={`player-item ${isCurrentPlayer ? 'current' : ''} ${player.is_host ? 'host' : ''}`}
+              className={`player-item ${isCurrentPlayer ? 'current' : ''} ${isParent ? 'parent' : ''} ${isCurrentTurn ? 'active-turn' : ''}`}
             >
               <div className="player-info">
-                <span className="player-name">
-                  {player.name}
-                  {player.is_host && ' [HOST]'}
-                  {isCurrentPlayer && ' (あなた)'}
-                </span>
-                {playerRoll && (
-                  <div className="player-result">
-                    <span className="hand-type">{playerRoll.hand_type}</span>
-                    {playerRoll.hand_value > 0 && (
-                      <span className="hand-value">({playerRoll.hand_value})</span>
+                <div className="player-name-row">
+                  <span className="player-name">
+                    {player.name}
+                    {isCurrentPlayer && ' (あなた)'}
+                  </span>
+                  <div className="player-badges">
+                    {player.is_host && <span className="badge host">HOST</span>}
+                    {isParent && <span className="badge parent-badge">親</span>}
+                    {isCurrentTurn && (
+                      <span className="badge turn-badge">ターン</span>
                     )}
                   </div>
-                )}
-              </div>
-              {playerRoll && (
-                <div className="player-dice">
-                  {[playerRoll.dice1, playerRoll.dice2, playerRoll.dice3].map((d, i) => (
-                    <span key={i} className="dice-mini">{d}</span>
-                  ))}
                 </div>
-              )}
-              {!playerRoll && rolls.length > 0 && (
-                <div className="waiting">待機中...</div>
+                <div className="player-stats">
+                  <span className="player-chips">{player.chips} チップ</span>
+                  {playerBet && !playerBet.settled && (
+                    <span className="player-bet">
+                      ベット: {playerBet.amount}
+                    </span>
+                  )}
+                  {playerBet?.settled && playerBet.result_multiplier != null && (
+                    <span
+                      className={`player-result ${
+                        playerBet.result_multiplier > 0
+                          ? 'win'
+                          : playerBet.result_multiplier < 0
+                            ? 'lose'
+                            : 'draw'
+                      }`}
+                    >
+                      {playerBet.result_multiplier > 0
+                        ? `+${playerBet.amount * playerBet.result_multiplier}`
+                        : playerBet.result_multiplier < 0
+                          ? `${playerBet.amount * playerBet.result_multiplier}`
+                          : '±0'}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {playerFinalRoll && (
+                <div className="player-roll-info">
+                  <div className="player-dice">
+                    {[
+                      playerFinalRoll.dice1,
+                      playerFinalRoll.dice2,
+                      playerFinalRoll.dice3,
+                    ].map((d, i) => (
+                      <span key={i} className="dice-mini">
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+                  <span className="player-hand-type">
+                    {playerFinalRoll.hand_type}
+                  </span>
+                </div>
               )}
             </div>
           )

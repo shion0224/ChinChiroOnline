@@ -1,96 +1,168 @@
 .player-list {
-  background: white;
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  padding: 1.5rem;
+  padding: 1.2rem;
   margin-bottom: 1rem;
 }
 
 .player-list h3 {
   margin-top: 0;
-  margin-bottom: 1rem;
-  color: #333;
-  font-size: 1.25rem;
+  margin-bottom: 0.8rem;
+  color: #ccc;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .players {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .player-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  background: #f8f9fa;
+  padding: 0.7rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 8px;
-  border: 2px solid #e9ecef;
+  border: 2px solid transparent;
   transition: all 0.3s;
 }
 
 .player-item.current {
-  border-color: #667eea;
-  background: #f0f4ff;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  border-color: rgba(79, 195, 247, 0.5);
+  background: rgba(79, 195, 247, 0.08);
 }
 
-.player-item.host {
-  border-left: 4px solid #ffc107;
+.player-item.parent {
+  border-left: 4px solid #f0c040;
+}
+
+.player-item.active-turn {
+  background: rgba(76, 175, 80, 0.1);
+  border-color: rgba(76, 175, 80, 0.5);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.2);
 }
 
 .player-info {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.3rem;
   flex: 1;
+}
+
+.player-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .player-name {
   font-weight: 600;
-  color: #333;
-  font-size: 1.1rem;
+  color: #eee;
+  font-size: 1rem;
 }
 
-.player-result {
+.player-badges {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.3rem;
+}
+
+.badge {
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge.host {
+  background: rgba(102, 126, 234, 0.3);
+  color: #8ca0ff;
+}
+
+.badge.parent-badge {
+  background: rgba(240, 192, 64, 0.3);
+  color: #f0c040;
+}
+
+.badge.turn-badge {
+  background: rgba(76, 175, 80, 0.3);
+  color: #81c784;
+  animation: pulse-turn 1.5s infinite;
+}
+
+@keyframes pulse-turn {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.player-stats {
+  display: flex;
+  gap: 0.8rem;
   align-items: center;
+  font-size: 0.85rem;
 }
 
-.hand-type {
+.player-chips {
+  color: #f0c040;
   font-weight: 600;
-  color: #667eea;
-  font-size: 0.875rem;
 }
 
-.hand-value {
-  color: #666;
-  font-size: 0.875rem;
+.player-bet {
+  color: #aaa;
+}
+
+.player-result.win {
+  color: #4caf50;
+  font-weight: bold;
+}
+
+.player-result.lose {
+  color: #f44336;
+  font-weight: bold;
+}
+
+.player-result.draw {
+  color: #888;
+}
+
+.player-roll-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
 }
 
 .player-dice {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.3rem;
 }
 
 .dice-mini {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  background: white;
-  border: 2px solid #667eea;
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   display: flex;
   justify-content: center;
   align-items: center;
   font-weight: 600;
-  font-size: 0.875rem;
-  color: #333;
+  font-size: 0.8rem;
+  color: #eee;
 }
 
-.waiting {
-  color: #999;
-  font-size: 0.875rem;
-  font-style: italic;
+.player-hand-type {
+  font-size: 0.8rem;
+  color: #4fc3f7;
+  font-weight: 600;
 }
-

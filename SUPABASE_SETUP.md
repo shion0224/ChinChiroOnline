@@ -9,23 +9,27 @@
    - Anon/Public Key
    - Service Role Key（Edge Functions用）
 
-## 2. 匿名認証の有効化
+## 2. データベーススキーマの作成
 
-1. Supabaseダッシュボード → Authentication → Providers
-2. **Anonymous Sign-ins** を有効にする
+SupabaseダッシュボードのSQL Editorで `supabase/migrations/001_network_multiplayer.sql` の内容を実行してください。
 
-## 3. データベーススキーマの作成
+このSQLは以下のテーブルを作成します：
 
-SupabaseダッシュボードのSQL Editorで `supabase/migrations/001_schema_update.sql` の内容を実行してください。
+| テーブル | 説明 |
+|---------|------|
+| `rooms` | ルーム情報（名前、ステータス、最大人数、初期チップ） |
+| `players` | プレイヤー情報（名前、チップ残高、ターン順） |
+| `game_rounds` | ゲームラウンド（フェーズ管理、親プレイヤー、現在のターン） |
+| `round_bets` | 各ラウンドのベット情報（賭け額、倍率、精算状態） |
+| `player_rolls` | サイコロ結果（3回までの振り直し対応、最終結果フラグ） |
 
-このSQLには以下が含まれます：
-- テーブル作成（rooms, players, game_rounds, player_rolls）
-- インデックス作成
-- Realtime有効化
-- RLSポリシー（認証ユーザーはSELECTのみ、書き込みはEdge Function経由）
-- Database Trigger（全員がサイコロを振ったら自動で勝敗判定）
+### ゲームラウンドのフェーズ
 
-## 4. 環境変数の設定
+```
+betting → parent_rolling → children_rolling → settlement → (次ラウンドのbetting)
+```
+
+## 3. 環境変数の設定
 
 `.env.local`ファイルを作成：
 
@@ -34,55 +38,93 @@ VITE_SUPABASE_URL=your_project_url
 VITE_SUPABASE_ANON_KEY=your_anon_key
 ```
 
-## 5. Edge Functionsのデプロイ
+## 4. Supabase Edge Functionsのデプロイ
 
-Supabase CLIを使用してEdge Functionsをデプロイします：
+### 前提条件
+
+Supabase CLIのインストール:
 
 ```bash
-# Supabase CLIのインストール
 npm install -g supabase
-
-# ログイン
-supabase login
-
-# プロジェクトとリンク
-supabase link --project-ref your_project_ref
-
-# 全Edge Functionsをデプロイ
-supabase functions deploy create-room
-supabase functions deploy join-room
-supabase functions deploy start-game
-supabase functions deploy roll-dice
-supabase functions deploy next-round
-supabase functions deploy leave-room
 ```
 
-## 6. Edge Functionsの環境変数
+### Supabaseにログイン
 
-Edge Functionsは以下の環境変数を自動的に使用します（Supabaseプロジェクトに紐付いている場合）：
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
+```bash
+supabase login
+```
+
+### プロジェクトにリンク
+
+```bash
+supabase link --project-ref your_project_ref
+```
+
+### Edge Functionsのデプロイ
+
+```bash
+# 全Edge Functionsを一括デプロイ
+supabase functions deploy start-game --no-verify-jwt
+supabase functions deploy place-bet --no-verify-jwt
+supabase functions deploy roll-dice --no-verify-jwt
+supabase functions deploy settle-round --no-verify-jwt
+```
+
+> **注意**: `--no-verify-jwt` は開発用です。本番環境ではJWT検証を有効にし、
+> 認証済みユーザーのみがEdge Functionを呼び出せるようにしてください。
+
+### Edge Functionsのシークレット設定
+
+```bash
+supabase secrets set SUPABASE_URL=your_project_url
+supabase secrets set SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
+
+> `SUPABASE_URL` と `SUPABASE_SERVICE_ROLE_KEY` はSupabaseプロジェクトに
+> デフォルトで設定されている場合があります。その場合はこのステップは不要です。
+
+## 5. Edge Functions一覧
+
+| 関数名 | 説明 | リクエストBody |
+|--------|------|---------------|
+| `start-game` | ゲーム開始、親決定 | `{ roomId, playerId }` |
+| `place-bet` | ベット配置 | `{ roundId, playerId, amount }` |
+| `roll-dice` | サイコロを振る（サーバー側） | `{ roundId, playerId }` |
+| `settle-round` | ラウンド精算 | `{ roundId, playerId }` |
+
+### roll-dice のバリデーション
+
+- ターンチェック: 現在のターンのプレイヤーのみがロール可能
+- フェーズチェック: `parent_rolling` or `children_rolling` のみ
+- ロール回数: 最大3回まで
+- サイコロ生成: サーバー側で `crypto.getRandomValues()` を使用
+
+## 6. ゲームフロー
+
+```
+1. ルーム作成/参加（フロントエンドからSupabase直接）
+2. ゲーム開始（start-game Edge Function）
+   → 親を決定、最初のラウンド（bettingフェーズ）を作成
+3. ベットフェーズ（place-bet Edge Function）
+   → 全子がベットしたら parent_rolling に遷移
+4. 親がサイコロを振る（roll-dice Edge Function）
+   → 即決役ならsettlementへ、通常目ならchildren_rollingへ
+5. 子が順番にサイコロを振る（roll-dice Edge Function）
+   → 全員完了でsettlementへ
+6. 精算（settle-round Edge Function）
+   → チップ移動、次ラウンド作成（親ローテーション）
+7. チップ0のプレイヤーがいたらゲーム終了
+```
 
 ## 7. 機能テスト
 
 アプリを起動して以下の機能をテスト：
-- 匿名認証（自動）
-- ルーム作成（Edge Function経由）
-- プレイヤー参加（Edge Function経由）
+- ルーム作成
+- プレイヤー参加（2名以上）
 - ゲーム開始（ホストのみ）
-- サイコロを振る（サーバー側で乱数生成）
-- 勝敗判定（Database Trigger自動判定）
-- 次のラウンド（ホストのみ）
-- リアルタイム更新
-
-## Edge Functions 一覧
-
-| 関数名 | 処理内容 |
-|--------|---------|
-| `create-room` | ルーム作成 + ホストプレイヤー登録 |
-| `join-room` | ルーム参加（状態チェック + 人数上限チェック） |
-| `start-game` | ゲーム開始（ホストのみ） |
-| `roll-dice` | サーバー側でサイコロを振る（不正防止） |
-| `next-round` | 次のラウンドを開始（ホストのみ） |
-| `leave-room` | ルーム退出（ホスト引き継ぎ対応） |
+- ベットフェーズ（子プレイヤーがベット）
+- 親のサイコロロール（最大3回振り直し）
+- 子のサイコロロール（各最大3回振り直し）
+- ラウンド精算（チップの移動確認）
+- 次ラウンドの親ローテーション
+- ゲーム終了条件（チップ0）
