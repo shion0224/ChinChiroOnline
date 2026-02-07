@@ -24,5 +24,26 @@ enabled = false
 [realtime]
 enabled = true
 
-[functions.verify_jwt]
-enabled = false
+[functions.create-room]
+verify_jwt = false
+
+[functions.join-room]
+verify_jwt = false
+
+[functions.leave-room]
+verify_jwt = false
+
+[functions.start-game]
+verify_jwt = false
+
+[functions.roll-dice]
+verify_jwt = false
+
+[functions.place-bet]
+verify_jwt = false
+
+[functions.settle-round]
+verify_jwt = false
+
+[functions.next-round]
+verify_jwt = false
