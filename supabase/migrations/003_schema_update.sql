@@ -82,10 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_player_rolls_game_round_id ON player_rolls(game_r
 CREATE INDEX IF NOT EXISTS idx_player_rolls_player_id ON player_rolls(player_id);
 
 -- ----- Realtime有効化 -----
-ALTER PUBLICATION supabase_realtime ADD TABLE rooms;
-ALTER PUBLICATION supabase_realtime ADD TABLE players;
-ALTER PUBLICATION supabase_realtime ADD TABLE player_rolls;
-ALTER PUBLICATION supabase_realtime ADD TABLE game_rounds;
+-- 002_network_multiplayer.sql で追加済みのためスキップ
 
 -- ----- RLS（Row Level Security）厳格化 -----
 
