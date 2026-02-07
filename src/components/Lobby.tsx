@@ -11,7 +11,7 @@ interface LobbyProps {
 }
 
 function Lobby({ user }: LobbyProps) {
-  const [playerName, setPlayerName] = useState('')
+  const [playerName, setPlayerName] = useState('Player')
   const [roomName, setRoomName] = useState('')
   const [roomId, setRoomId] = useState<string | null>(null)
   const [playerId, setPlayerId] = useState<string | null>(null)
@@ -134,7 +134,7 @@ function Lobby({ user }: LobbyProps) {
               type="text"
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
-              placeholder="あなたの名前"
+              placeholder="Player"
               maxLength={20}
             />
           </label>
