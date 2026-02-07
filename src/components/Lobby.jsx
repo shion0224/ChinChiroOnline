@@ -12,6 +12,7 @@ function Lobby() {
   const [joinRoomId, setJoinRoomId] = useState('')
   const [availableRooms, setAvailableRooms] = useState([])
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   // 利用可能なルームを取得
   useEffect(() => {
@@ -61,45 +62,31 @@ function Lobby() {
 
     try {
       setError('')
+      setLoading(true)
 
-      // ルームを作成
-      const { data: roomData, error: roomError } = await supabase
-        .from('rooms')
-        .insert({
-          name: roomName,
-          status: 'waiting'
-        })
-        .select()
-        .single()
+      // Edge Function を呼び出してルーム作成
+      const { data, error: fnError } = await supabase.functions.invoke('create-room', {
+        body: {
+          playerName: playerName.trim(),
+          roomName: roomName.trim(),
+          maxPlayers: 4,
+        },
+      })
 
-      if (roomError) throw roomError
+      if (fnError) throw fnError
 
-      // プレイヤーを作成（ホスト）
-      const { data: playerData, error: playerError } = await supabase
-        .from('players')
-        .insert({
-          room_id: roomData.id,
-          name: playerName,
-          is_host: true,
-          is_ready: false
-        })
-        .select()
-        .single()
+      if (data.error) {
+        throw new Error(data.error)
+      }
 
-      if (playerError) throw playerError
-
-      // ルームのhost_idを更新
-      await supabase
-        .from('rooms')
-        .update({ host_id: playerData.id })
-        .eq('id', roomData.id)
-
-      setRoomId(roomData.id)
-      setPlayerId(playerData.id)
+      setRoomId(data.roomId)
+      setPlayerId(data.playerId)
       setIsHost(true)
     } catch (err) {
       console.error('Error creating room:', err)
       setError(err.message || 'ルームの作成に失敗しました')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -117,42 +104,30 @@ function Lobby() {
 
     try {
       setError('')
+      setLoading(true)
 
-      // ルームが存在するか確認
-      const { data: roomData, error: roomError } = await supabase
-        .from('rooms')
-        .select('*')
-        .eq('id', roomToJoin)
-        .single()
+      // Edge Function を呼び出してルーム参加
+      const { data, error: fnError } = await supabase.functions.invoke('join-room', {
+        body: {
+          playerName: playerName.trim(),
+          roomId: roomToJoin,
+        },
+      })
 
-      if (roomError || !roomData) {
-        throw new Error('ルームが見つかりません')
+      if (fnError) throw fnError
+
+      if (data.error) {
+        throw new Error(data.error)
       }
 
-      if (roomData.status !== 'waiting') {
-        throw new Error('このルームは既に開始されています')
-      }
-
-      // プレイヤーを追加
-      const { data: playerData, error: playerError } = await supabase
-        .from('players')
-        .insert({
-          room_id: roomToJoin,
-          name: playerName,
-          is_host: false,
-          is_ready: false
-        })
-        .select()
-        .single()
-
-      if (playerError) throw playerError
-
-      setRoomId(roomToJoin)
-      setPlayerId(playerData.id)
+      setRoomId(data.roomId)
+      setPlayerId(data.playerId)
       setIsHost(false)
     } catch (err) {
       console.error('Error joining room:', err)
       setError(err.message || 'ルームへの参加に失敗しました')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -193,7 +168,9 @@ function Lobby() {
                 maxLength={30}
               />
             </label>
-            <button onClick={createRoom}>ルームを作成</button>
+            <button onClick={createRoom} disabled={loading}>
+              {loading ? '作成中...' : 'ルームを作成'}
+            </button>
           </div>
 
           <div className="join-room">
@@ -207,7 +184,9 @@ function Lobby() {
                 placeholder="ルームIDを入力"
               />
             </label>
-            <button onClick={() => joinRoom()}>参加</button>
+            <button onClick={() => joinRoom()} disabled={loading}>
+              {loading ? '参加中...' : '参加'}
+            </button>
           </div>
         </div>
 
@@ -223,7 +202,7 @@ function Lobby() {
                     <span className="room-name">{room.name}</span>
                     <span className="room-id">ID: {room.id.substring(0, 8)}...</span>
                   </div>
-                  <button onClick={() => joinRoom(room.id)}>参加</button>
+                  <button onClick={() => joinRoom(room.id)} disabled={loading}>参加</button>
                 </div>
               ))}
             </div>
@@ -235,4 +214,3 @@ function Lobby() {
 }
 
 export default Lobby
-

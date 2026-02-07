@@ -7,99 +7,122 @@
 3. プロジェクトの設定から以下を取得：
    - Project URL
    - Anon/Public Key
+   - Service Role Key（Edge Functions用）
 
-## 2. データベーススキーマの作成
+## 2. Supabase CLI のインストール（ローカル開発用）
 
-SupabaseダッシュボードのSQL Editorで以下のSQLを実行：
+```bash
+# npm でインストール
+npm install -g supabase
 
-```sql
--- ルームテーブル
-CREATE TABLE rooms (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  host_id UUID,
-  status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'playing', 'finished')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+# 初期化（既に supabase/ ディレクトリが存在するためスキップ可能）
+# npx supabase init
 
--- プレイヤーテーブル
-CREATE TABLE players (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  user_id UUID,
-  is_host BOOLEAN DEFAULT FALSE,
-  is_ready BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+# ローカル環境を起動
+npx supabase start
 
--- ゲームラウンドテーブル
-CREATE TABLE game_rounds (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
-  round_number INTEGER NOT NULL DEFAULT 1,
-  status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'playing', 'finished')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- プレイヤーのサイコロ結果テーブル
-CREATE TABLE player_rolls (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  game_round_id UUID REFERENCES game_rounds(id) ON DELETE CASCADE,
-  player_id UUID REFERENCES players(id) ON DELETE CASCADE,
-  dice1 INTEGER NOT NULL CHECK (dice1 BETWEEN 1 AND 6),
-  dice2 INTEGER NOT NULL CHECK (dice2 BETWEEN 1 AND 6),
-  dice3 INTEGER NOT NULL CHECK (dice3 BETWEEN 1 AND 6),
-  hand_type TEXT NOT NULL,
-  hand_value INTEGER,
-  rolled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- インデックスの作成
-CREATE INDEX idx_players_room_id ON players(room_id);
-CREATE INDEX idx_game_rounds_room_id ON game_rounds(room_id);
-CREATE INDEX idx_player_rolls_game_round_id ON player_rolls(game_round_id);
-CREATE INDEX idx_player_rolls_player_id ON player_rolls(player_id);
-
--- Realtime有効化
-ALTER PUBLICATION supabase_realtime ADD TABLE rooms;
-ALTER PUBLICATION supabase_realtime ADD TABLE players;
-ALTER PUBLICATION supabase_realtime ADD TABLE player_rolls;
+# ローカル環境を停止
+npx supabase stop
 ```
 
-## 3. Row Level Security (RLS) ポリシーの設定
+## 3. データベーススキーマの作成
 
-認証なしで動作するようにする場合（開発用）：
+### 方法A: マイグレーションファイルを使用（推奨）
 
-```sql
--- すべてのテーブルでRLSを有効化
-ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
-ALTER TABLE players ENABLE ROW LEVEL SECURITY;
-ALTER TABLE game_rounds ENABLE ROW LEVEL SECURITY;
-ALTER TABLE player_rolls ENABLE ROW LEVEL SECURITY;
-
--- すべてのユーザーが読み書き可能（開発用 - 本番環境では適切なポリシーを設定）
-CREATE POLICY "Allow all operations on rooms" ON rooms FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all operations on players" ON players FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all operations on game_rounds" ON game_rounds FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all operations on player_rolls" ON player_rolls FOR ALL USING (true) WITH CHECK (true);
+```bash
+# ローカル環境が起動している状態で
+npx supabase db reset
 ```
 
-## 4. 環境変数の設定
+これにより `supabase/migrations/001_initial_schema.sql` が自動的に適用されます。
 
-`.env.local`ファイルを作成：
+### 方法B: SupabaseダッシュボードのSQL Editorで直接実行
+
+`supabase/migrations/001_initial_schema.sql` の内容をSQL Editorにコピー&ペーストして実行してください。
+
+## 4. Edge Functions のデプロイ
+
+### ローカルでテスト
+
+```bash
+# Edge Functions をローカルで実行
+npx supabase functions serve
+```
+
+### クラウドにデプロイ
+
+```bash
+# Supabaseプロジェクトにリンク
+npx supabase link --project-ref your-project-ref
+
+# 全Edge Functions をデプロイ
+npx supabase functions deploy create-room
+npx supabase functions deploy join-room
+npx supabase functions deploy leave-room
+npx supabase functions deploy start-game
+npx supabase functions deploy roll-dice
+```
+
+### Edge Functions の環境変数
+
+Edge Functions はデプロイ先の Supabase プロジェクトの以下の環境変数を自動的に使用します：
+- `SUPABASE_URL` - プロジェクトURL
+- `SUPABASE_SERVICE_ROLE_KEY` - サービスロールキー（DB操作用）
+
+ローカル開発時は `npx supabase start` で自動設定されます。
+
+## 5. フロントエンドの環境変数設定
+
+`.env.local` ファイルを作成：
 
 ```env
 VITE_SUPABASE_URL=your_project_url
 VITE_SUPABASE_ANON_KEY=your_anon_key
 ```
 
-## 5. 機能テスト
+ローカル開発時は `npx supabase start` の出力に表示されるURLとキーを使用：
+
+```env
+VITE_SUPABASE_URL=http://localhost:54321
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...（supabase startの出力を参照）
+```
+
+## 6. 開発の流れ
+
+```bash
+# 1. Supabase ローカル環境を起動
+npx supabase start
+
+# 2. Edge Functions をローカルで起動
+npx supabase functions serve
+
+# 3. フロントエンドを起動
+npm run dev
+
+# 4. ブラウザで http://localhost:5173 にアクセス
+```
+
+## 7. 機能テスト
 
 アプリを起動して以下の機能をテスト：
-- ルーム作成
-- プレイヤー参加
-- サイコロを振る
-- リアルタイム更新
+- ルーム作成（Edge Function: create-room）
+- プレイヤー参加（Edge Function: join-room）
+- ゲーム開始（Edge Function: start-game）
+- サイコロを振る（Edge Function: roll-dice）
+- リアルタイム更新（Supabase Realtime）
+- ルーム退出（Edge Function: leave-room）
+- ホスト引き継ぎ（ホスト退出時に自動）
 
+## 8. トラブルシューティング
+
+### Edge Functions が呼び出せない
+- `supabase functions serve` が起動しているか確認
+- `.env.local` の `VITE_SUPABASE_URL` が正しいか確認
+
+### Realtime が動作しない
+- `supabase/migrations/001_initial_schema.sql` 内の `ALTER PUBLICATION supabase_realtime` が適用されているか確認
+- Supabase ダッシュボードで Realtime が有効になっているか確認
+
+### CORS エラー
+- Edge Functions の `_shared/cors.ts` で許可するオリジンを確認
+- 本番環境では `Access-Control-Allow-Origin` を具体的なドメインに変更することを推奨

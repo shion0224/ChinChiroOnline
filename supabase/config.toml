@@ -1,0 +1,29 @@
+# Supabase CLI configuration for Chinchiro Online
+[project]
+id = ""
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+
+[auth.external.github]
+enabled = false
+
+[realtime]
+enabled = true
+
+[functions]
+verify_jwt = false
