@@ -2,6 +2,18 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
 import { getSupabaseAdmin } from '../_shared/supabaseAdmin.ts'
 
+/**
+ * leave-room Edge Function
+ *
+ * ルームからプレイヤーを退出させる。
+ * - waiting / finished 状態では即退出可能
+ * - playing 状態でも呼べる（vote-leave で承認後に呼ばれるケース等）
+ *
+ * 退出後:
+ * - 0人 → ルーム削除
+ * - 1人 → ゲーム終了（playing中なら status=finished に変更）
+ * - 2人以上 → 続行（ホスト引き継ぎ）
+ */
 serve(async (req: Request) => {
   // CORS プリフライト
   const corsResponse = handleCors(req)
@@ -37,6 +49,23 @@ serve(async (req: Request) => {
 
     const wasHost = playerData.is_host
 
+    // ルーム状態を取得
+    const { data: room } = await supabase
+      .from('rooms')
+      .select('status')
+      .eq('id', roomId)
+      .single()
+
+    const roomStatus = room?.status ?? 'waiting'
+
+    // このプレイヤーに関連する pending の退出リクエストをクリーンアップ
+    await supabase
+      .from('leave_requests')
+      .update({ status: 'approved' })
+      .eq('room_id', roomId)
+      .eq('requester_id', playerId)
+      .eq('status', 'pending')
+
     // プレイヤーを削除
     const { error: deleteError } = await supabase
       .from('players')
@@ -67,6 +96,22 @@ serve(async (req: Request) => {
       )
     }
 
+    // 1人だけ残った場合 + ゲーム中だった → ゲーム終了
+    if (remainingPlayers.length === 1 && roomStatus === 'playing') {
+      // 進行中のラウンドを終了
+      await supabase
+        .from('game_rounds')
+        .update({ status: 'finished' })
+        .eq('room_id', roomId)
+        .eq('status', 'playing')
+
+      // ルームステータスを finished に変更
+      await supabase
+        .from('rooms')
+        .update({ status: 'finished' })
+        .eq('id', roomId)
+    }
+
     // ホストが抜けた場合、次のプレイヤーをホストに昇格
     if (wasHost && remainingPlayers.length > 0) {
       const newHost = remainingPlayers[0]
@@ -83,7 +128,11 @@ serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ message: 'ルームから退出しました', roomDeleted: false }),
+      JSON.stringify({
+        message: 'ルームから退出しました',
+        roomDeleted: false,
+        remainingPlayers: remainingPlayers.length,
+      }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {

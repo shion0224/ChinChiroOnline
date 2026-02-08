@@ -116,6 +116,24 @@ export interface SettleRoundResponse {
   message?: string
 }
 
+/** 退出リクエスト */
+export interface LeaveRequest {
+  id: string
+  room_id: string
+  requester_id: string
+  status: 'pending' | 'approved' | 'rejected'
+  created_at: string
+}
+
+/** 退出投票 */
+export interface LeaveVote {
+  id: string
+  leave_request_id: string
+  voter_id: string
+  approved: boolean
+  created_at: string
+}
+
 /** ルーム一覧用（プレイヤー数付き） */
 export interface RoomWithPlayerCount extends Room {
   players: { count: number }[]

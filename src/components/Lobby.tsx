@@ -10,6 +10,33 @@ interface LobbyProps {
   user: User | null
 }
 
+const SESSION_KEY = 'chinchiro_session'
+
+interface SavedSession {
+  roomId: string
+  playerId: string
+  isHost: boolean
+  playerName: string
+}
+
+function saveSession(session: SavedSession) {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
+}
+
+function loadSession(): SavedSession | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+function clearSession() {
+  sessionStorage.removeItem(SESSION_KEY)
+}
+
 function Lobby({ user }: LobbyProps) {
   const [playerName, setPlayerName] = useState('Player')
   const [roomName, setRoomName] = useState('')
@@ -20,21 +47,95 @@ function Lobby({ user }: LobbyProps) {
   const [availableRooms, setAvailableRooms] = useState<RoomWithPlayerCount[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [restoring, setRestoring] = useState(true)
+
+  // リロード時にセッションを復元する
+  useEffect(() => {
+    const restoreSession = async () => {
+      const saved = loadSession()
+      if (!saved) {
+        setRestoring(false)
+        return
+      }
+
+      try {
+        // DBにプレイヤーがまだ存在するか確認
+        const { data: player } = await supabase
+          .from('players')
+          .select('id, is_host, name, room_id')
+          .eq('id', saved.playerId)
+          .eq('room_id', saved.roomId)
+          .maybeSingle()
+
+        if (player) {
+          // ルームがまだ存在するか確認
+          const { data: room } = await supabase
+            .from('rooms')
+            .select('id')
+            .eq('id', saved.roomId)
+            .maybeSingle()
+
+          if (room) {
+            // セッション復元
+            setRoomId(saved.roomId)
+            setPlayerId(saved.playerId)
+            setIsHost(player.is_host)
+            setPlayerName(saved.playerName)
+          } else {
+            // ルームが消えている
+            clearSession()
+          }
+        } else {
+          // プレイヤーが消えている
+          clearSession()
+        }
+      } catch (err) {
+        console.error('Session restore error:', err)
+        clearSession()
+      } finally {
+        setRestoring(false)
+      }
+    }
+
+    restoreSession()
+  }, [])
 
   useEffect(() => {
     loadAvailableRooms()
 
-    const channel = supabase
-      .channel('rooms')
+    // rooms テーブルの変更を購読（ルーム作成・ステータス変更）
+    const roomsChannel = supabase
+      .channel('lobby-rooms')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'rooms' },
         () => loadAvailableRooms()
       )
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.warn('[Realtime] lobby rooms channel error — ポーリングで補完します')
+        }
+      })
+
+    // players テーブルの変更も購読（プレイヤー参加・退出でルーム人数が変わる）
+    const playersChannel = supabase
+      .channel('lobby-players')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'players' },
+        () => loadAvailableRooms()
+      )
       .subscribe()
 
+    // ポーリングフォールバック: Realtime が動作しない場合の保険
+    const pollInterval = setInterval(() => {
+      loadAvailableRooms()
+    }, 5000)
+
     return () => {
-      supabase.removeChannel(channel)
+      supabase.removeChannel(roomsChannel)
+      supabase.removeChannel(playersChannel)
+      clearInterval(pollInterval)
     }
   }, [])
 
@@ -70,6 +171,12 @@ function Lobby({ user }: LobbyProps) {
 
       const result = await createRoomApi(playerName.trim(), roomName.trim(), 4)
 
+      saveSession({
+        roomId: result.roomId,
+        playerId: result.playerId,
+        isHost: true,
+        playerName: playerName.trim(),
+      })
       setRoomId(result.roomId)
       setPlayerId(result.playerId)
       setIsHost(true)
@@ -99,6 +206,12 @@ function Lobby({ user }: LobbyProps) {
 
       const result = await joinRoomApi(playerName.trim(), roomToJoin)
 
+      saveSession({
+        roomId: result.roomId,
+        playerId: result.playerId,
+        isHost: false,
+        playerName: playerName.trim(),
+      })
       setRoomId(result.roomId)
       setPlayerId(result.playerId)
       setIsHost(false)
@@ -108,6 +221,14 @@ function Lobby({ user }: LobbyProps) {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (restoring) {
+    return (
+      <div className="loading-screen">
+        <h2>セッションを復元中...</h2>
+      </div>
+    )
   }
 
   if (roomId && playerId) {

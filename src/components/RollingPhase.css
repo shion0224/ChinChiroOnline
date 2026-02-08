@@ -76,27 +76,50 @@
   font-size: 0.9rem;
 }
 
-.roll-button {
-  padding: 1rem 2.5rem;
-  background: linear-gradient(135deg, #4fc3f7, #29b6f6);
-  color: #fff;
-  border: none;
-  border-radius: 12px;
-  font-size: 1.2rem;
+.roll-result-overlay {
+  margin-top: 0.5rem;
+  padding: 0.8rem;
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-radius: 8px;
+  animation: fadeInUp 0.4s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.roll-result-overlay.spilled {
+  background: rgba(244, 67, 54, 0.15);
+  border-color: rgba(244, 67, 54, 0.4);
+}
+
+.spill-label {
+  font-size: 1.4rem;
   font-weight: bold;
-  cursor: pointer;
-  transition: all 0.3s;
-  box-shadow: 0 4px 15px rgba(79, 195, 247, 0.3);
+  color: #f44336;
+  margin-bottom: 0.3rem;
+  animation: shakeSpill 0.5s ease-in-out;
 }
 
-.roll-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(79, 195, 247, 0.4);
+@keyframes shakeSpill {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
 }
 
-.roll-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+@keyframes dicePulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
 }
 
 .my-result {

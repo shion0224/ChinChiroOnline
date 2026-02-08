@@ -136,3 +136,24 @@ export async function settleRound(
     playerId,
   })
 }
+
+/**
+ * 退出リクエストを送信する（ゲーム中）
+ */
+export async function requestLeave(
+  roomId: string,
+  playerId: string
+): Promise<{ immediate: boolean; requestId?: string; message?: string }> {
+  return callEdgeFunction('request-leave', { roomId, playerId })
+}
+
+/**
+ * 退出リクエストに投票する
+ */
+export async function voteLeave(
+  requestId: string,
+  playerId: string,
+  approved: boolean
+): Promise<{ result: string; message?: string }> {
+  return callEdgeFunction('vote-leave', { requestId, playerId, approved })
+}
